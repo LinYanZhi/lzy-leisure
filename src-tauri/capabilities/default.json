@@ -1,0 +1,14 @@
+{
+  "identifier": "default",
+  "description": "Default capability",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "dialog:allow-confirm",
+    "core:window:allow-set-always-on-top",
+    "appkit-core:default",
+    "process:default",
+    "log:default"
+  ]
+}

@@ -1,0 +1,3858 @@
+/* ══════════════════════════════════════════════════════════
+   休闲时光 - 合并样式（漫画书架 + 视频管理）
+   ══════════════════════════════════════════════════════════ */
+
+/* 顶栏左侧区域不阻挡滚轮事件，且撑满剩余空间使滚轮覆盖整个顶栏 */
+.topbar-left {
+  flex: 1;
+  -webkit-app-region: no-drag;
+}
+
+/* ═══════════════ 模块壳 ═══════════════ */
+
+/* 子页面自带 padding 与内部滚动，去除 app-kit .page-content 默认的
+   padding: 12px 20px / overflow-y: auto，避免双层边距与滚动冲突（继承问题）。
+   用 :has() 限定直接子元素，设置面板内部使用独立的 .panel-content，不受影响。 */
+.page-content:has(> .shelf),
+.page-content:has(> .chapter-page),
+.page-content:has(> .module-page),
+.page-content:has(> .shelf-empty),
+.page-content:has(> .v-module),
+.page-content:has(> .vdt-page),
+.page-content:has(> .vsv-page) {
+  padding: 0;
+  overflow: hidden;
+}
+
+.module-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.module-subbar {
+  flex-shrink: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+}
+
+.module-subbar .tb-bar {
+  border-bottom: none;
+}
+
+.module-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ═══════════════ 漫画：书架主页 ═══════════════ */
+.shelf {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 16px 24px;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.shelf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.shelf-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.shelf-roots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1;
+}
+
+.root-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  max-width: 280px;
+}
+
+.root-chip:hover {
+  background: var(--bg-card-hover);
+}
+
+.root-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.root-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.root-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-badge);
+  border-radius: 8px;
+  padding: 1px 7px;
+}
+
+/* 通用按钮基类：裸 .btn（返回、打开目录等）统一为幽灵按钮风格 */
+.btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.btn:hover {
+  border-color: var(--border);
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 小尺寸按钮（详情页返回等） */
+.btn-sm {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--btn-text);
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.shelf-error {
+  color: var(--error);
+  font-size: 13px;
+}
+
+.shelf-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.shelf-empty .muted {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ── 漫画源管理弹窗 ── */
+.source-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.source-modal {
+  width: min(680px, 96vw);
+  max-height: min(560px, 86vh);
+  background: var(--bg-card);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+.source-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.source-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.source-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.source-close:hover {
+  color: var(--text-primary);
+}
+.source-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.source-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 6px 0 2px;
+  flex-shrink: 0;
+}
+.source-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 8px 2px;
+}
+.source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.source-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-badge, rgba(128, 128, 128, 0.08));
+}
+.source-path {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: break-all;
+}
+.source-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.source-actions .btn-ghost,
+.source-actions .btn-danger {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.source-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 18px;
+  overflow-y: auto;
+  padding: 2px 14px 24px 2px;
+  align-content: start;
+}
+
+.comic-card {
+  cursor: grab;
+  transition: transform 0.12s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.comic-card.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.comic-card:hover {
+  transform: translateY(-2px);
+}
+
+.comic-card:hover .comic-cover-wrap {
+  border-color: var(--accent);
+}
+
+.comic-cover-wrap {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  aspect-ratio: 5 / 7;
+  background: var(--bg-badge);
+}
+
+.comic-cover-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.comic-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.comic-badge-completed {
+  background: var(--accent);
+  color: var(--btn-text);
+}
+
+/* 左上角打开目录按钮：默认隐藏，鼠标悬浮卡片时显示 */
+.comic-open-btn {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.comic-card:hover .comic-open-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.comic-open-btn:hover {
+  background: var(--accent);
+  color: var(--btn-text);
+  transform: scale(1.08);
+}
+
+.comic-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.78));
+  color: #fff;
+  font-size: 11px;
+  padding: 18px 8px 6px;
+  text-align: center;
+}
+
+.comic-title {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comic-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ═══════════════ 漫画：章节列表 ═══════════════ */
+.chapter-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 16px 24px;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.chapter-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.chapter-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chapter-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.btn-ghost {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btn-ghost:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.btn-danger {
+  background: none;
+  border: 1px solid var(--error, #e5534b);
+  color: var(--error, #e5534b);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btn-danger:hover {
+  background: rgba(229, 83, 75, 0.12);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.center-hint {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.chapter-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 24px;
+}
+
+.chapter-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  cursor: pointer;
+}
+
+.chapter-item:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+}
+
+.chapter-item-title {
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chapter-item-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ── 章节卡片：整卡封面（参考旧项目 MangaShelf） ── */
+.chapter-card {
+  position: relative;
+  /* 5:7 高度占位：高度恒定与封面加载状态无关，避免加载前塌陷导致卡片重叠 */
+  padding-top: 140%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-badge);
+  box-shadow: 0 2px 8px var(--shadow, rgba(0, 0, 0, 0.18));
+}
+
+.chapter-card .cover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.chapter-card .card-info {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 40px 10px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.82));
+  z-index: 2;
+}
+
+.chapter-card .card-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chapter-card .card-meta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 2px;
+}
+
+.chapter-card .chapter-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  z-index: 3;
+  overflow: hidden;
+}
+
+.chapter-card .chapter-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+/* ── 深色主题：降低漫画封面亮度（浅色主题保持原样） ── */
+[data-theme="dark"] .comic-cover-wrap img,
+[data-theme="dark"] .chapter-card .cover {
+  filter: brightness(0.85);
+}
+
+/* ── 章节卡片 hover：设置自定义封面按钮 ── */
+.pick-cover-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.chapter-card:hover .pick-cover-btn {
+  opacity: 1;
+}
+.pick-cover-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* ── 选封面弹窗 ── */
+.pick-cover-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pick-cover-modal {
+  width: min(440px, 92vw);
+  height: min(480px, 82vh);
+  background: var(--bg-card);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+.pick-cover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.pick-cover-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pick-cover-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.pick-cover-container {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 10px 14px 0;
+  border-radius: 8px;
+  background:
+    repeating-linear-gradient(45deg, var(--bg-badge), var(--bg-badge) 12px, rgba(0, 0, 0, 0.03) 12px, rgba(0, 0, 0, 0.03) 24px);
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pick-cover-container:active {
+  cursor: grabbing;
+}
+.pick-cover-strip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  z-index: 1;
+}
+.pick-cover-page-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-badge);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.pick-cover-page {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.pick-cover-page-fail {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+.pick-cover-window {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--bg-card), 0 2px 12px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.pick-cover-position {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  white-space: nowrap;
+}
+.pick-cover-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 12px;
+  flex-shrink: 0;
+}
+.pick-cover-toolbar .pick-cover-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.pick-cover-px {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pick-cover-scroll-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+.pick-cover-scroll-step input[type="range"] {
+  width: 90px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.pick-cover-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+/* PDF 选封面：页码导航（弹窗宽度有限，导航最前，滑块被压缩） */
+.pdf-cover-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.pdf-cover-nav input[type="number"] {
+  width: 46px;
+  padding: 2px 4px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-input, var(--bg-badge));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.pdf-cover-nav .btn-ghost {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.pick-cover-toolbar:has(.pdf-cover-nav) .pick-cover-slider {
+  flex: 1;
+  min-width: 40px;
+}
+
+/* ═══════════════ 漫画：阅读器（webtoon，沉浸式） ═══════════════ */
+.reader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: #0a0a0a; /* 阅读时统一深色沉浸 */
+}
+
+/* 顶部覆盖层：悬浮不占文档流，默认隐藏，点击画面呼出 */
+.reader-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0));
+  color: #fff;
+  z-index: 3;
+  box-sizing: border-box;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.reader-toolbar.hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reader-toolbar .btn-ghost {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.reader-toolbar .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.reader-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-meta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* 无痕滚动开关 */
+.reader-seamless {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.reader-seamless input {
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* 滚轮步长滑块 */
+.reader-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.reader-step input[type="range"] {
+  width: 84px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.reader-step span {
+  min-width: 30px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.reader-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0 60px;
+}
+
+.reader-page {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.reader-page img {
+  max-width: 100%;
+  display: block;
+  background: #0a0a0a;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.reader-page-placeholder {
+  width: 100%;
+  max-width: 720px;
+  min-height: 55vh;
+  background: var(--bg-badge);
+}
+
+/* 底部控制条：上一张 / 进度条 / 下一张 */
+.reader-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0));
+  z-index: 3;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.reader-controls.hidden {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reader-nav-btn {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+
+.reader-nav-btn:active {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.reader-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* 页面级翻页按钮仅 PC 显示（触屏端由滚动代替，控制条保留章节导航） */
+.reader-nav-btn.only-desktop {
+  display: inline-block;
+}
+
+.reader-seek {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.reader-pageno {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* PDF 渲染画布（占位 div 已定高，canvas 撑满） */
+.reader-pdf-canvas {
+  max-width: 100%;
+  display: block;
+  background: #0a0a0a;
+}
+
+.reader-pdf-canvas.hidden {
+  display: none;
+}
+
+.reader-end {
+  margin-top: 16px;
+  padding: 14px 24px;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.reader-end:hover {
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* ═══════════════ 视频：通用 ═══════════════ */
+
+.muted {
+  color: var(--text-secondary);
+}
+
+.vs-error,
+.pv-error {
+  color: var(--error);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/* ═══════════════ 视频：影片网格页 ═══════════════ */
+
+.vs-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 14px 20px;
+  gap: 12px;
+  overflow: hidden;
+}
+
+/* ── 种类栏（全部/电影/短视频/动漫/竖屏） ── */
+
+.vs-kindbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.vs-kind-btn {
+  padding: 4px 14px;
+  font-size: 12px;
+  border: 1px solid var(--border-input);
+  border-radius: 14px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.vs-kind-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.vs-kind-btn.active {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 视频卡片：有同名字幕时的角标 */
+.vs-sub-badge {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  font-size: 10px;
+  padding: 1px 6px;
+  line-height: 16px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  z-index: 1;
+}
+
+.vs-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.vs-toolbar-left,
+.vs-toolbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.vs-toolbar-left {
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+/* 视频导入路径（源）切换 chips */
+.vs-roots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1;
+}
+
+.vs-ffmpeg-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  border-radius: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: var(--bg-badge);
+}
+
+.vs-ffmpeg-chip.ok {
+  color: var(--success);
+  border-color: var(--success);
+  background: transparent;
+}
+
+.vs-ffmpeg-chip.bad {
+  color: var(--error);
+  border-color: var(--error);
+  background: transparent;
+}
+
+.vs-scan-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.vs-search {
+  width: 180px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.vs-search:focus {
+  border-color: var(--accent);
+}
+
+.vs-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ── 筛选区 ── */
+
+.vs-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.vs-filter-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.vs-filter-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 26px;
+  flex-shrink: 0;
+  min-width: 44px;
+  text-align: right;
+}
+
+.vs-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vs-chip {
+  padding: 3px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-input);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.vs-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.vs-chip.active {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.vs-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── 网格 ── */
+
+/* 剧集卡片墙 */
+.vs-series-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  overflow-y: auto;
+  padding: 2px 4px 12px 2px;
+  flex: 1;
+  align-content: start;
+}
+
+/* 剧集卡片：封面 + 下方标题（无盒子边框，B 站式） */
+.vs-series-card {
+  cursor: pointer;
+  min-width: 0;
+  border-radius: 8px;
+  padding: 4px;
+  transition: background 0.15s;
+}
+
+.vs-series-card:hover {
+  background: var(--bg-card-hover);
+}
+
+.vs-series-no-cover {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.vs-series-count {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+}
+
+/* 播放进度条（视频卡封面底部） */
+.vs-progress-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.vs-progress-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.vs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  overflow-y: auto;
+  padding: 2px 4px 12px 2px;
+  flex: 1;
+  align-content: start;
+}
+
+/* 视频卡片：封面 + 下方标题 / 集数 / meta（无盒子边框，B 站式） */
+.vs-card {
+  cursor: pointer;
+  min-width: 0;
+  border-radius: 8px;
+  padding: 4px;
+  transition: background 0.15s;
+}
+
+.vs-card:hover {
+  background: var(--bg-card-hover);
+}
+
+.vs-cover-wrap {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: var(--bg-badge);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.vs-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.25s ease;
+}
+
+.vs-card:hover .vs-cover,
+.vs-series-card:hover .vs-cover {
+  transform: scale(1.04);
+}
+
+.vs-card-hover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.vs-cover-wrap:hover .vs-card-hover {
+  opacity: 1;
+}
+
+.vs-card-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vs-card-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.vs-title {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.8em;
+}
+
+.vs-episode {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.vs-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vs-kinds {
+  margin-top: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.vs-kind {
+  font-size: 10px;
+  padding: 0 6px;
+  line-height: 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-badge);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.vs-tags {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.vs-tag {
+  font-size: 11px;
+  padding: 0 6px;
+  border: 1px solid;
+  border-radius: 6px;
+  line-height: 17px;
+  white-space: nowrap;
+}
+
+.vs-actors {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vs-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* ═══════════════ 视频：剧集详情页 ═══════════════ */
+
+.vsv-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 14px 16px;
+  gap: 12px;
+}
+
+.vsv-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.vsv-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vsv-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-right: 4px;
+}
+
+.vsv-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.vsv-cover {
+  width: 220px;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-badge);
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+.vsv-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vsv-cover-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.vsv-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vsv-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.vsv-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.vsv-episodes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vsv-ep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  min-width: 0;
+}
+
+.vsv-ep:hover {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+}
+
+.vsv-ep-index {
+  width: 30px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.vsv-ep-cover {
+  position: relative;
+  width: 120px;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-badge);
+  flex-shrink: 0;
+}
+
+.vsv-ep-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vsv-ep-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.vsv-ep-title {
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vsv-ep-meta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.vsv-empty {
+  padding: 24px 0;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.vsv-error {
+  color: var(--error);
+  font-size: 13px;
+  padding: 8px 12px;
+  border: 1px solid var(--error);
+  border-radius: 8px;
+  background: var(--bg-badge);
+}
+
+@media (max-width: 720px) {
+  .vsv-cover {
+    width: 160px;
+  }
+  .vsv-ep-cover {
+    width: 96px;
+  }
+}
+
+/* ═══════════════ 视频：播放器页 ═══════════════ */
+
+.pv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg-app);
+  display: flex;
+  flex-direction: column;
+}
+
+.pv-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.pv-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.pv-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.pv-video-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  min-width: 0;
+  background: #000;
+  position: relative;
+}
+
+.pv-video-holder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.pv-video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  outline: none;
+}
+
+/* jassub 字幕渲染层：覆盖在视频上，与视频严格同尺寸同位置 */
+.pv-sub-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.pv-sub-canvas.hidden {
+  display: none;
+}
+
+.pv-sub-toggle.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pv-loading {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.pv-cover-thumb {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  width: 120px;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.pv-cover-thumb:hover {
+  opacity: 1;
+}
+
+.pv-cover-thumb img,
+.pv-cover-thumb div {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pv-cover-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.pv-cover-thumb:hover .pv-cover-hint {
+  opacity: 1;
+}
+
+/* ── 右侧编辑面板 ── */
+
+.pv-panel {
+  width: 340px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  padding: 14px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.pv-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+
+.pv-meta-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pv-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.pv-meta-key {
+  color: var(--text-muted);
+  width: 48px;
+  flex-shrink: 0;
+}
+
+.pv-meta-val {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-path {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg-badge);
+  border-radius: 6px;
+  padding: 6px 8px;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.pv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.pv-field > span {
+  color: var(--text-secondary);
+}
+
+.pv-field em {
+  color: var(--error);
+  font-style: normal;
+}
+
+.pv-field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.pv-field-row .pv-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.pv-field input,
+.pv-field textarea,
+.pv-field select {
+  padding: 6px 9px;
+  border: 1px solid var(--border-input);
+  border-radius: 7px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.pv-field input:focus,
+.pv-field textarea:focus,
+.pv-field select:focus {
+  border-color: var(--accent);
+}
+
+.pv-field textarea {
+  resize: vertical;
+  min-height: 48px;
+}
+
+.pv-field input[type="color"] {
+  padding: 2px;
+  width: 60px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.pv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pv-chip {
+  padding: 3px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-input);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.pv-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pv-chip.active {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pv-chip-group {
+  margin-top: 8px;
+}
+
+.pv-chip-group-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.pv-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.pv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ═══════════════ 视频：演员页 ═══════════════ */
+
+.av-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 14px 20px;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.av-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.av-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.av-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  overflow-y: auto;
+  padding: 2px 4px 12px 2px;
+  align-content: start;
+  flex: 1;
+}
+
+.av-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 8px 10px;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.av-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+}
+
+.av-avatar-wrap {
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+}
+
+.av-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+.av-avatar-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text-badge);
+  background: var(--bg-avatar-placeholder);
+  border: 1px solid var(--border);
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.av-name {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.av-meta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.av-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.av-card:hover .av-delete {
+  opacity: 1;
+}
+
+.av-delete:hover {
+  background: rgba(224, 85, 85, 0.15);
+  color: var(--error);
+}
+
+.av-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ═══════════════ 视频：标签页 ═══════════════ */
+
+.tv-page {
+  display: flex;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 14px 20px;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.tv-groups {
+  width: 240px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  padding: 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+}
+
+.tv-tags {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  padding: 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.tv-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.tv-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tv-panel-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.tv-group-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tv-group-item:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.tv-group-item.active {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.tv-group-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-badge);
+  border-radius: 8px;
+  padding: 0 7px;
+  line-height: 16px;
+}
+
+.tv-group-del {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.tv-group-del:hover {
+  background: rgba(224, 85, 85, 0.15);
+  color: var(--error);
+}
+
+.tv-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: flex-start;
+}
+
+.tv-tag-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px 5px 10px;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.tv-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.tv-tag-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════
+   移动端适配（手机 / 窄屏浏览器访问局域网服务）
+   ══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* ── 顶栏（共享壳） ── */
+  .topbar {
+    padding: 0 8px;
+  }
+  .topbar .tb-btn {
+    padding: 0 9px;
+    font-size: 13px;
+  }
+  .topbar .tb-indicator {
+    display: none;
+  }
+
+  /* ── 模块二级标签 ── */
+  .module-subbar {
+    padding: 0;
+  }
+
+  /* ── 漫画书架 ── */
+  .shelf {
+    padding: 12px;
+    gap: 10px;
+  }
+  /* 工具条单行：源 chips 横滑 + 右侧源管理按钮固定（不再换行占两行） */
+  .shelf-toolbar {
+    flex-wrap: nowrap;
+  }
+  .shelf-roots {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 6px;
+  }
+  .shelf-roots::-webkit-scrollbar {
+    display: none;
+  }
+  .root-chip {
+    flex-shrink: 0;
+    max-width: 100%;
+    font-size: 12px;
+  }
+  .shelf-toolbar-actions {
+    width: auto;
+    flex-shrink: 0;
+    justify-content: flex-end;
+    /* 操作按钮多时（如故事会 4 个）横向滚动，不换行不挤压 */
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .shelf-toolbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+  .shelf-toolbar-actions .btn-ghost,
+  .shelf-toolbar-actions .btn-danger {
+    flex-shrink: 0;
+  }
+  .shelf-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 12px;
+    padding: 2px 4px 16px 2px;
+  }
+  .comic-title {
+    font-size: 12px;
+  }
+  .comic-card:hover {
+    transform: none;
+  }
+  /* 移动端无 hover：打开目录按钮常显 */
+  .comic-open-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* ── 章节列表 ── */
+  .chapter-page {
+    padding: 12px;
+  }
+  .chapter-item {
+    padding: 12px 14px;
+  }
+
+  /* ── 阅读器（滚动式天然兼容触屏） ── */
+  .reader-toolbar {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .reader-meta {
+    font-size: 11px;
+  }
+  .reader-scroll {
+    padding: 6px 0 48px;
+  }
+  .reader-controls {
+    gap: 8px;
+    padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .reader-nav-btn {
+    padding: 10px 16px; /* 触屏点击热区 */
+  }
+  .reader-nav-btn.only-desktop {
+    display: none; /* 手机隐藏页面级翻页，保留章节导航 */
+  }
+
+  /* ── 视频网格：固定 2 列，卡片更大（B 站式竖屏信息流） ── */
+  .vs-page {
+    padding: 12px;
+  }
+  /* 演员 / 标签页：内边距收窄，工具条不挤 */
+  .av-page,
+  .tv-page {
+    padding: 12px;
+    gap: 10px;
+  }
+  .vs-grid,
+  .vs-series-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 12px;
+    padding: 2px 0 12px;
+  }
+  .vs-card,
+  .vs-series-card {
+    padding: 0; /* 手机端无 hover，去掉热区 padding 让封面更大 */
+  }
+  .vs-cover-wrap {
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+  .vs-title {
+    font-size: 14px;
+    min-height: 2.6em;
+  }
+  .vs-episode,
+  .vs-meta {
+    font-size: 12px;
+  }
+
+  /* ── 视频播放器（竖屏：视频在上、编辑面板在下） ── */
+  .pv-topbar {
+    padding: 8px 10px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .pv-body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .pv-video-wrap {
+    flex: none;
+    max-height: 44vh;
+    padding: 8px;
+  }
+  .pv-panel {
+    width: 100%;
+    flex: 1;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── 设置面板 ── */
+  .settings-sidebar {
+    width: 132px;
+  }
+  .settings-tab-item {
+    font-size: 12px;
+    padding: 8px 8px;
+  }
+}
+
+/* ═══════════════ 小说：书架封面 / 阅读器 ═══════════════ */
+
+.novel-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 目录侧栏（左侧抽屉，覆盖在正文上方） */
+.novel-toc {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 4;
+  width: 280px;
+  max-width: 78vw;
+  background: #121212;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.novel-toc-title {
+  padding: 14px 16px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.novel-toc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0 12px;
+}
+
+.novel-toc-item {
+  padding: 8px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.novel-toc-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+
+.novel-toc-item.active {
+  background: rgba(74, 144, 217, 0.18);
+  color: var(--accent);
+}
+
+/* 正文滚动区 */
+.novel-scroll {
+  padding-top: 56px; /* 给悬浮工具栏留出高度 */
+}
+
+/* 正文排版（深色适配，适合长时间阅读） */
+.novel-content {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 8px 20px 40px;
+  box-sizing: border-box;
+  line-height: 2;
+  color: #d5d5d5;
+  word-break: break-word;
+}
+
+.novel-content p {
+  margin: 0 0 1em;
+  text-indent: 2em;
+}
+
+.novel-content h1,
+.novel-content h2,
+.novel-content h3,
+.novel-content h4,
+.novel-content h5,
+.novel-content h6 {
+  color: #fff;
+  margin: 1.2em 0 0.6em;
+  line-height: 1.5;
+}
+
+.novel-content img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+.novel-content a {
+  color: var(--accent);
+}
+
+.novel-content blockquote {
+  margin: 1em 2em;
+  padding: 4px 12px;
+  border-left: 3px solid rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.novel-content pre {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 0.92em;
+  line-height: 1.6;
+}
+
+.novel-content code {
+  font-family: var(--font-mono);
+}
+
+.novel-chapter-title {
+  font-size: 1.35em;
+  text-align: center;
+  margin: 4px 0 28px !important;
+  text-indent: 0 !important;
+}
+
+.novel-loading {
+  padding: 48px 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .novel-content {
+    padding: 4px 16px 40px;
+    line-height: 1.9;
+  }
+  .novel-scroll {
+    padding-top: 48px;
+  }
+}
+
+/* ═══════════════ 视频：重构布局（左侧导航 + 内容区） ═══════════════ */
+
+/* 左侧导航 + 主内容 左右分栏，撑满模块高度 */
+.v-module {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.v-sidebar {
+  width: 192px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px 10px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-card);
+  overflow-y: auto;
+}
+
+.v-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 10px;
+}
+
+.v-nav-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  padding: 4px 10px 3px;
+  user-select: none;
+}
+
+.v-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  min-width: 0;
+  transition: background 0.12s, color 0.12s;
+}
+
+.v-nav-item:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.v-nav-item.active {
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.v-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v-nav-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--bg-badge);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.v-nav-item.active .v-nav-count {
+  background: transparent;
+  color: var(--accent);
+}
+
+.v-nav-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+}
+
+.v-sidebar-footer {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.v-sidebar-btn {
+  width: 100%;
+  text-align: center;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.v-sidebar-footer .vs-ffmpeg-chip {
+  align-self: flex-start;
+}
+
+.v-main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* 主区页面标题 */
+.vs-page-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 筛选按钮：展开态 / 有选中项态 */
+.v-filter-btn.active,
+.v-filter-btn.has {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+/* ═══════════════ 视频：详情页（vdt-*） ═══════════════ */
+
+.vdt-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vdt-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.vdt-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vdt-topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.vdt-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.vdt-hero {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.vdt-cover {
+  width: 320px;
+  flex-shrink: 0;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-badge);
+  box-shadow: 0 4px 16px var(--shadow, rgba(0, 0, 0, 0.18));
+}
+
+.vdt-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vdt-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vdt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.vdt-field > span {
+  color: var(--text-secondary);
+}
+
+.vdt-field input,
+.vdt-field textarea {
+  padding: 6px 9px;
+  border: 1px solid var(--border-input);
+  border-radius: 7px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.vdt-field input:focus,
+.vdt-field textarea:focus {
+  border-color: var(--accent);
+}
+
+.vdt-field textarea {
+  resize: vertical;
+  min-height: 48px;
+}
+
+.vdt-field-row {
+  display: flex;
+  gap: 10px;
+}
+
+.vdt-field-row .vdt-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.vdt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vdt-chip {
+  padding: 4px 12px;
+  font-size: 12px;
+  border: 1px solid var(--border-input);
+  border-radius: 14px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.vdt-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.vdt-chip.active {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.vdt-chip-group {
+  margin-top: 6px;
+}
+
+.vdt-chip-group-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.vdt-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.vdt-meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.vdt-meta-item {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.vdt-meta-item b {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.vdt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.vdt-path {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg-badge);
+  border-radius: 6px;
+  padding: 6px 8px;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+/* 所属剧集快速切换 */
+.vdt-series {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.vdt-series-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.vdt-series-list {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.vdt-series-ep {
+  width: 150px;
+  flex-shrink: 0;
+  cursor: pointer;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.vdt-series-ep:hover {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+}
+
+.vdt-series-ep.active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.vdt-series-ep-cover {
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-badge);
+}
+
+.vdt-series-ep-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vdt-series-ep-title {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vdt-series-ep-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ═══════════════ 视频：播放器补充样式 ═══════════════ */
+
+/* 手机浏览器不支持的格式提示条 */
+.pv-mobile-warn {
+  background: rgba(255, 170, 0, 0.14);
+  border: 1px solid rgba(255, 170, 0, 0.4);
+  color: #ffb84d;
+  font-size: 12px;
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+
+/* ── 播放器：连播 / 全屏 / 快捷键帮助 ── */
+
+/* 剧集连播位置指示 */
+.pv-ep-pos {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.pv-fs.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 快捷键帮助面板 */
+.pv-help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pv-help-box {
+  background: var(--bg-modal);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  width: min(430px, 92vw);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.pv-help-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.pv-help-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 7px 16px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.pv-help-row {
+  display: contents;
+}
+
+.pv-kbd {
+  display: inline-block;
+  min-width: 34px;
+  text-align: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* 窄窗口适配 */
+@media (max-width: 768px) {
+  .v-sidebar {
+    width: 150px;
+    padding: 10px 6px;
+  }
+  .v-nav-item {
+    padding: 6px 8px;
+  }
+  .vdt-hero {
+    flex-direction: column;
+  }
+  .vdt-cover {
+    width: 100%;
+  }
+  .vdt-topbar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .vdt-topbar-actions {
+    gap: 6px;
+  }
+  .vdt-title {
+    font-size: 14px;
+  }
+}
+
+/* ═══════════════ 故事会：书架（年份分组） ═══════════════ */
+
+.story-shelf-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 2px 4px 12px 2px;
+}
+
+.story-year-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* 年份详情页头部（返回按钮 + 年份标题） */
+.story-year-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+
+.story-year-header .story-year-title {
+  margin: 0;
+}
+
+.story-year-count {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.story-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.story-card {
+  cursor: pointer;
+  transition: transform 0.12s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.story-card:hover {
+  transform: translateY(-2px);
+}
+
+.story-card:hover .story-cover-wrap {
+  border-color: var(--accent);
+}
+
+.story-cover-wrap {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  aspect-ratio: 5 / 7;
+  background: var(--bg-badge);
+}
+
+.story-card:hover .comic-open-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 年份卡左上角版本角标（斜放斜切，区分正刊/文摘版/校园版） */
+.story-badge {
+  position: absolute;
+  top: 10px;
+  left: -26px;
+  transform: rotate(-45deg);
+  z-index: 2;
+  background: var(--accent);
+  color: var(--btn-text);
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 30px;
+  letter-spacing: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+/* 文摘版：紫蓝 */
+.story-badge-wz {
+  background: #7c5cff;
+}
+
+/* 校园版：青绿 */
+.story-badge-xy {
+  background: #2aa876;
+}
+
+/* 卡片刷新封面按钮（悬浮封面右上角；hover 显现，与打开目录按钮对称不重叠） */
+.story-refresh-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.story-card:hover .story-refresh-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.story-refresh-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--btn-text);
+  transform: scale(1.08);
+}
+
+.story-refresh-btn:disabled {
+  cursor: default;
+}
+
+.story-refresh-btn svg {
+  display: block;
+}
+
+/* 刷新中旋转动画 */
+.story-refresh-spin {
+  animation: story-refresh-rotate 0.9s linear infinite;
+}
+
+@keyframes story-refresh-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 封面区：占位 / 已生成封面 / 失败占位 */
+.story-cover {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.story-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.story-cover-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--text-badge);
+  background: var(--bg-badge);
+}
+
+/* 后台封面补齐进度提示条（年份总览层，与工具栏/卡片网格同宽对齐） */
+.story-cover-progress {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(255, 197, 66, 0.12);
+  border: 1px solid rgba(255, 197, 66, 0.35);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.story-title {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.story-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.story-set-btn {
+  margin-top: 6px;
+}
+
+/* ═══════════════ 故事会：双页书式阅读器 ═══════════════ */
+
+.story-reader {
+  background: #141414;
+}
+
+/* 页面舞台：flex:1 撑满，页面垂直居中、左右并排（书脊间距 48px 与 JS 常量一致） */
+.story-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  padding: 56px 0 40px; /* 上留白避免被悬浮工具栏遮挡 */
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 控件显隐切换提示：居中短暂显示后自动淡出，不遮挡阅读 */
+.story-ui-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.72);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  line-height: 1;
+  pointer-events: none;
+  animation: story-hint-fade 2.6s ease forwards;
+}
+@keyframes story-hint-fade {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* 单个页面槽位：点击翻页（左/右），不触发空白区控件切换 */
+.story-page-slot {
+  display: flex;
+  cursor: pointer;
+}
+
+/* 手机端逐页图片流：单页自适应（等比缩放、不裁切）；
+   放大查看时内容可能超出视口，裁剪防止溢出；cursor 提示可点击 */
+.story-page-slot-img {
+  flex: 1;
+  align-self: stretch;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  cursor: zoom-in;
+  touch-action: none;
+}
+
+.story-page-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 2px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  background: #0a0a0a;
+  -webkit-user-select: none;
+  user-select: none;
+  will-change: transform;
+  transform-origin: center center;
+}
+
+.story-page-canvas {
+  display: block;
+  background: #0a0a0a;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  border-radius: 2px;
+}
+
+/* 底部控制条：上一页 / 下一页（书式翻页）；悬浮、随空白点击隐藏 */
+.story-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+  z-index: 3;
+  pointer-events: auto;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.story-controls.hidden {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.story-controls-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* 底部中间页数按钮（点击弹页码跳转列表）；比两侧翻页按钮略窄 */
+.story-page-btn {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 页码跳转列表（底部页数按钮点击弹出）：半透明蒙层 + 中央网格面板 */
+.story-index-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.62);
+  z-index: 6;
+  -webkit-tap-highlight-color: transparent;
+}
+.story-index-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(340px, calc(100% - 40px));
+  max-height: 74%;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(26, 26, 32, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+}
+.story-index-title {
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.story-index-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.story-index-item {
+  padding: 9px 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.story-index-item:active {
+  background: rgba(255, 255, 255, 0.18);
+}
+.story-index-item.cur {
+  background: var(--accent, #4f6ef7);
+  color: #fff;
+  font-weight: 600;
+}
+.story-index-close {
+  flex-shrink: 0;
+  padding: 10px 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.story-index-close:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 移动端：故事会网格缩小、翻页按钮扩大触屏热区 */
+@media (max-width: 768px) {
+  .story-grid {
+    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+    gap: 12px;
+  }
+  .story-card:hover {
+    transform: none;
+  }
+  .story-card .comic-open-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .story-stage {
+    gap: 32px;
+    padding: 48px 8px 32px;
+  }
+  .story-controls-hint {
+    display: none;
+  }
+  .story-controls {
+    gap: 10px;
+  }
+  .story-controls .reader-nav-btn {
+    min-width: 88px;
+    min-height: 46px;
+    padding: 10px 16px;
+    font-size: 15px;
+    border-radius: 23px;
+  }
+  /* 中间页数按钮：窄一些，保证三按钮一行放得下 */
+  .story-controls .story-page-btn {
+    min-width: 104px;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+}
+
+/* ═══════════════ 视频：移动端壳（二级导航横条 + 抽屉） ═══════════════
+   PC 端渲染左侧导航布局（v-module），手机端（≤768px）渲染本壳：
+   内容顶部二级导航（全部/剧集/演员/标签/菜单）→ 内容区；
+   完整导航在「菜单」抽屉里；模块切换由 App 底部导航承担。 */
+
+/* 上下三段式（覆盖 .v-module 的左右分栏） */
+.v-module-mobile {
+  flex-direction: column;
+}
+
+.vm-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.vm-icon-btn:active {
+  background: var(--bg-card-hover);
+}
+
+.vm-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+
+/* 手机端页面（演员/标签/视频墙等）作为 vm-body 子项必须占满宽度 */
+.vm-body > * {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── 抽屉（左侧滑出，复用 VideoSidebar） ── */
+.vm-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+}
+
+.vm-drawer {
+  width: min(280px, 84vw);
+  height: 100%;
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.35);
+  animation: vm-drawer-in 0.2s ease;
+}
+
+@keyframes vm-drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.vm-drawer-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 6px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.vm-drawer-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.vm-drawer .v-sidebar {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  border-right: none;
+  background: transparent;
+  padding-top: 6px;
+}
+
+/* ── 二级导航横条（内容顶部） ── */
+.vm-secnav {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.vm-secnav::-webkit-scrollbar {
+  display: none;
+}
+
+.vm-sec-item {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 16px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s, color 0.12s;
+}
+
+.vm-sec-item:active {
+  background: var(--bg-card-hover);
+}
+
+.vm-sec-item.active {
+  color: var(--accent);
+  background: var(--accent-light);
+  font-weight: 600;
+}
+
+/* ── 手机端内容区适配 ── */
+@media (max-width: 768px) {
+  /* 主区工具条：手机上标题/搜索都不要，仅保留「筛选」按钮靠右（源管理入抽屉） */
+  .v-module-mobile .vs-toolbar {
+    justify-content: flex-end;
+  }
+  .v-module-mobile .vs-toolbar-left {
+    display: none;
+  }
+  .v-module-mobile .vs-search {
+    display: none;
+  }
+  .v-module-mobile .vs-manager-btn {
+    display: none;
+  }
+
+  /* 标签页：左右分栏改上下（分组栏横滑） */
+  .tv-page {
+    flex-direction: column;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .tv-groups {
+    width: 100%;
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 8px;
+  }
+  .tv-groups .tv-panel-head {
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
+  .tv-group-item {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+/* ═══════════════ App 级移动端壳（顶栏精简 + 底部模块导航） ═══════════════ */
+
+/* 主内容 + 底部导航容器：PC 端底部导航隐藏，移动端显示 */
+.app-mobile-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.app-mobile-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* 所有模块根页面（v-module / shelf / 演员 / 标签等）都必须占满宽度 */
+.app-mobile-content > * {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.app-mobile-nav {
+  display: none;
+}
+
+/* 顶栏左侧模块名（手机端替代 tab 栏） */
+.topbar-module-name {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  /* 顶栏紧凑：图标间距缩小，不占竖屏高度 */
+  .topbar {
+    height: 44px;
+    min-height: 44px;
+    padding: 0 6px 0 0;
+  }
+  .topbar-right {
+    gap: 2px;
+    padding-left: 4px;
+  }
+  .theme-toggle,
+  .settings-btn,
+  .pin-btn,
+  .skin-btn,
+  .font-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* App 底部模块导航（漫画 / 视频 / 小说 / 故事会） */
+  .app-mobile-nav {
+    display: flex;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    background: var(--bg-card);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 100;
+  }
+  .amn-btn {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 0 7px;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 10.5px;
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .amn-btn.active {
+    color: var(--accent);
+  }
+  .amn-btn.active svg {
+    stroke-width: 2.5;
+  }
+}
+
+/* ═══════════════ 故事会：顶栏操作按钮（桌面按钮行 / 手机 ⋮ 菜单） ═══════════════ */
+
+.story-actions-desktop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 手机端 ⋮ 菜单容器（桌面隐藏） */
+.story-actions-more {
+  display: none;
+  position: relative;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .story-actions-desktop {
+    display: none;
+  }
+  .story-actions-more {
+    display: block;
+  }
+  .story-more-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    background: transparent;
+  }
+  .story-more-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 160;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 136px;
+    padding: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  }
+  .story-more-item {
+    padding: 10px 12px;
+    border: none;
+    border-radius: 7px;
+    background: none;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .story-more-item:active {
+    background: var(--bg-card-hover);
+  }
+  .story-more-item-danger {
+    color: var(--danger);
+  }
+  .story-more-item:disabled {
+    opacity: 0.5;
+  }
+}
+

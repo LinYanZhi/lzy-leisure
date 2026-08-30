@@ -1,0 +1,22 @@
+# Rust
+/target
+Cargo.lock
+
+# Node.js
+/node_modules
+/dist
+pnpm-lock.yaml
+
+# IDE
+/.idea
+.vscode
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Tauri
+src-tauri/target
+ui/dist

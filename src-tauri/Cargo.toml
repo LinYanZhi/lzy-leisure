@@ -1,0 +1,47 @@
+[package]
+name = "lzy-leisure"
+# 版本号独立于 workspace（v0.1.4：故事会手机端逐页图片流阅读器 + 点击放大/拖拽缩放 + 底部三按钮翻页）
+version = "0.1.4"
+edition.workspace = true
+
+[lib]
+name = "lzy_leisure_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset", "tray-icon", "image-png"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-process = "2"
+tauri-plugin-log = "2"
+# HTTP 服务层：浏览器/局域网访问（axum + 静态托管 + SSE + Range 视频流）
+axum = "0.7"
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["fs", "cors", "trace"] }
+tokio = { version = "1", features = ["fs", "io-util", "sync", "net", "rt", "rt-multi-thread", "time", "macros"] }
+futures-util = "0.3"
+# 运行时解码 PNG 图标
+reqwest = { version = "0.12", features = ["stream"] }
+serde.workspace = true
+serde_json.workspace = true
+appkit-core = { git = "https://github.com/GLBT-gz/appkit", features = ["bridge", "cmd-lite", "cmd-db"] }
+opener = "0.7"
+log = "0.4"
+# SQLite（bundled 免安装）
+rusqlite = { version = "0.32", features = ["bundled"] }
+# 漫画压缩包读取（zip/cbz）
+zip = { version = "2", default-features = false, features = ["deflate"] }
+# PDF 页数解析（纯 Rust，不渲染）
+lopdf = "0.35"
+# PDF 第一页封面按需读取：xref 流/对象流的 FlateDecode 解压（lopdf 传递依赖，不新增下载）
+flate2 = "1"
+# 封面缩略图生成（png/jpeg/webp/gif/bmp）
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
+# 图片以 base64 data URL 传回前端
+base64 = "0.22"
+# 稳定 ID 生成（旧版 md5[:12] 兼容）
+md5 = "0.7"
+# 字幕文本编码检测（ass/srt 常见 GBK）
+encoding_rs = "0.8"
