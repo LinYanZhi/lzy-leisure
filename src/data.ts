@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // 休闲时光 - 数据声明
 //
 // 所有数据项统一在此声明，DataManager 自动识别和管理。
@@ -22,19 +22,22 @@ export const store = defineDataStore({
     },
   },
   items: {
-    /** 顶层模块标签页（漫画 / 视频 / 小说[预留]） */
+    /** 顶层模块标签页（漫画 / 视频 / 小说[预留]）。
+     *  导航状态：不跨标签页同步，浏览器多开时各页独立（一个看漫画、一个看视频互不干扰） */
     "module-tab": {
       storage: "localStorage",
       category: "ui",
       desc: "当前选中的模块标签页",
       default: "comics" as string,
+      syncCrossTab: false,
     },
-    /** 视频模块内部标签页（影片 / 演员 / 标签） */
+    /** 视频模块内部标签页（影片 / 演员 / 标签）——导航状态，不跨标签页同步 */
     "video-tab": {
       storage: "localStorage",
       category: "ui",
       desc: "视频模块内当前选中的标签页",
       default: "home" as string,
+      syncCrossTab: false,
     },
     /** 漫画阅读器默认宽度（百分比，0 表示自适应） */
     "reader-width": {
