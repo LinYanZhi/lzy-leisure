@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useData } from "@glbt/appkit-ui";
 import { api, type Comic, type PageInfo } from "../../api";
 import { store } from "../../data";
@@ -230,40 +230,50 @@ function ImageReaderInner({
     if (appendingRef.current || noMoreRef.current) return;
     if (chapters.length === 0) return; // 章节列表未就绪：不置 noMore，等加载完成后重试
     const q = queueRef.current;
+    // 初始章节页面尚未加载完成（队列为空）时直接返回，稍后 effect / 滚动会重试：
+    // 若此刻按 q[-1] 取末章会崩溃并把 noMore 钉死为 true，导致该章无缝拼接永久失效
+    if (q.length === 0) return;
     const lo = loIdxRef.current ?? chapterIdx;
+    // 当前章不在章节列表中（数据异常）：不盲目接到 chapters[0]
+    if (lo < 0) return;
     const nextIdx = lo + q.length;
-    if (nextIdx < 0 || nextIdx >= chapters.length) {
-      noMoreRef.current = true;
-      setNoMore(true);
-      return;
-    }
-    const next = chapters[nextIdx];
-    // 仅图片章节（folder/archive）可拼接；PDF / 子系列为拼接边界
-    if (next.type !== "folder" && next.type !== "archive") {
+    if (nextIdx >= chapters.length) {
       noMoreRef.current = true;
       setNoMore(true);
       return;
     }
     appendingRef.current = true;
     try {
-      const pages = await api.listPages(next.id);
-      if (pages.length === 0) {
+      // 从 nextIdx 起向后探测：跳过空章（0 页），接入首个非空可拼接章节；
+      // 遇到 PDF / 子系列等拼接边界即停止，不跨过边界
+      let probe = nextIdx;
+      let appended = false;
+      while (probe < chapters.length) {
+        const cand = chapters[probe];
+        // 仅图片章节（folder/archive）可拼接；PDF / 子系列为拼接边界
+        if (cand.type !== "folder" && cand.type !== "archive") break;
+        const pages = await api.listPages(cand.id);
+        if (pages.length > 0) {
+          const last = queueRef.current[queueRef.current.length - 1];
+          const entry: QueuedChapter = {
+            comic: cand,
+            pages,
+            pageOffset: last.pageOffset + last.pages.length,
+          };
+          const q2 = [...queueRef.current, entry];
+          queueRef.current = q2;
+          setQueue(q2);
+          appended = true;
+          break;
+        }
+        probe += 1; // 空章：跳过继续向后
+      }
+      if (!appended) {
         noMoreRef.current = true;
         setNoMore(true);
-        return;
       }
-      const last = q[q.length - 1];
-      const entry: QueuedChapter = {
-        comic: next,
-        pages,
-        pageOffset: last.pageOffset + last.pages.length,
-      };
-      const q2 = [...q, entry];
-      queueRef.current = q2;
-      setQueue(q2);
     } catch {
-      noMoreRef.current = true;
-      setNoMore(true);
+      // 单次失败不置 noMore：下次滚动 / 恢复时会重试，避免一次瞬时失败让整条拼接失效
     } finally {
       appendingRef.current = false;
     }
@@ -273,7 +283,10 @@ function ImageReaderInner({
   const prependPrev = useCallback(async () => {
     if (prependingRef.current || noMorePrevRef.current) return;
     if (chapters.length === 0) return; // 章节列表未就绪：不置 noMorePrev，等加载完成后重试
+    // 初始章节尚未加载完成时直接返回，避免把上一章拼到一个空队列上（加载完成后会重试）
+    if (queueRef.current.length === 0) return;
     const lo = loIdxRef.current ?? chapterIdx;
+    if (lo < 0) return; // 当前章不在章节列表（数据异常）
     const prevIdx = lo - 1;
     if (prevIdx < 0) {
       noMorePrevRef.current = true;
@@ -312,7 +325,7 @@ function ImageReaderInner({
       // DOM 提交后把滚动位置下移新章高度，保持视图内容不动
       prependPendingRef.current = { oldScrollTop, oldScrollHeight };
     } catch {
-      noMorePrevRef.current = true;
+      // 单次失败不置 noMorePrev：下次滚动时会重试
     } finally {
       prependingRef.current = false;
     }
@@ -361,6 +374,10 @@ function ImageReaderInner({
   // 关闭无痕开关：把拼接队列裁剪到当前所在章节，原地回到单章模式
   useEffect(() => {
     if (seamless) return;
+    // 关闭时总是复位拼接边界标记（即使队列只有一章），保证再次开启后能重新尝试拼接
+    noMoreRef.current = false;
+    setNoMore(false);
+    noMorePrevRef.current = false;
     const q = queueRef.current;
     if (q.length <= 1) return;
     const cur = chapterIdxRef.current;
@@ -375,9 +392,6 @@ function ImageReaderInner({
     loIdxRef.current = (loIdxRef.current ?? chapterIdx) + cur;
     chapterIdxRef.current = 0;
     setCurChapterIdx(0);
-    noMoreRef.current = false;
-    setNoMore(false);
-    noMorePrevRef.current = false;
     // 队列收缩后重新定位到当前页
     requestAnimationFrame(() => {
       const el = pageRefs.current[p];
