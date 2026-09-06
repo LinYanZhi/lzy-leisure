@@ -2,7 +2,7 @@
 name = "lzy-leisure"
 # 版本号独立于 workspace（v0.1.4：故事会手机端逐页图片流阅读器 + 点击放大/拖拽缩放 + 底部三按钮翻页）
 version = "0.1.4"
-edition.workspace = true
+edition = "2021"
 
 [lib]
 name = "lzy_leisure_lib"
@@ -24,9 +24,10 @@ tokio = { version = "1", features = ["fs", "io-util", "sync", "net", "rt", "rt-m
 futures-util = "0.3"
 # 运行时解码 PNG 图标
 reqwest = { version = "0.12", features = ["stream"] }
-serde.workspace = true
-serde_json.workspace = true
-appkit-core = { git = "https://github.com/GLBT-gz/appkit", features = ["bridge", "cmd-lite", "cmd-db"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# 共享框架：本机相对路径（与前端 @glbt/appkit-ui 的 file: 引用一致，目录布局不可变）
+appkit-core = { path = "../../GLBT-gz/app-kit/shared/core", features = ["bridge", "cmd-lite", "cmd-db"] }
 opener = "0.7"
 log = "0.4"
 # SQLite（bundled 免安装）

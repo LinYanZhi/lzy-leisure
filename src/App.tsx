@@ -1,4 +1,4 @@
-﻿import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   setWindowPin,
   AppLayout,
@@ -28,7 +28,7 @@ import VideoSeriesView from "./components/video/VideoSeriesView";
 import PlayerView from "./components/video/PlayerView";
 import ActorsView from "./components/video/ActorsView";
 import TagsView from "./components/video/TagsView";
-import "@glbt/appkit-ui/styles/index.css";
+import "@glbt/appkit-ui/styles";
 import "./App.css";
 
 // ── 顶层模块标签（漫画 / 视频 / 小说 / 故事会） ──

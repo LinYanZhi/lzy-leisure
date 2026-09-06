@@ -1,4 +1,4 @@
-import { createViteConfig } from "../../../app-kit/shared/ui/src/vite-config.ts";
+import { createViteConfig } from "@glbt/appkit-ui/vite-config";
 export default createViteConfig({
   port: 5183,
   strictPort: false,
