@@ -565,6 +565,8 @@ pub(crate) async fn set_comic_cover_from_offset(
             );
             let mut config = std::collections::HashMap::new();
             config.insert("cover_crop_offset".to_string(), offset.to_string());
+            // 标记已按偏移生成：get_cover 命中该标记后不再重复重建（迁移来的默认图会据此恢复手动封面）
+            config.insert("cover_from_offset".to_string(), "1".to_string());
             let _ = crate::covers_db::save_configs(&bucket, &key, &config);
         }
         Ok(())
@@ -573,13 +575,19 @@ pub(crate) async fn set_comic_cover_from_offset(
     .map_err(|e| format!("封面生成失败: {e}"))?
 }
 
-/// 恢复章节封面为自动生成（清除本体封面库中的封面，下次请求重新生成）
+/// 恢复章节封面为自动生成（清除本体封面库中的封面及手动裁剪参数，下次请求按默认生成）
 #[tauri::command]
 pub(crate) fn reset_comic_cover(comic_id: String) -> Result<(), String> {
     let comic = comic_db::get_comic(&comic_id)?.ok_or_else(|| "漫画不存在".to_string())?;
     if let Some(bucket) = crate::covers_db::bucket_dir(&comic) {
         let key = crate::covers_db::rel_key_of(&comic, &bucket);
         let _ = crate::covers_db::delete_cover(&bucket, &key);
+        // 同时清除手动裁剪参数，避免 get_cover 依据残留 offset 又把手动封面反推回来
+        let _ = crate::covers_db::delete_config_keys(
+            &bucket,
+            &key,
+            &["cover_crop_offset", "cover_crop_y", "cover_from_offset"],
+        );
     }
     Ok(())
 }

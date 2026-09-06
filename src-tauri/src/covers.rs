@@ -56,20 +56,85 @@ pub(crate) fn generate_thumbnail(data: &[u8], target: (u32, u32)) -> Result<(Vec
     Ok((out, "image/jpeg".to_string(), w, h))
 }
 
+/// 页面条带索引（外部封面库缓存优先，未命中则构建并保存）——供手动封面恢复用
+fn cached_page_index(comic: &Comic) -> Result<PageIndex, String> {
+    if let Some(bucket) = crate::covers_db::bucket_dir(comic) {
+        let key = crate::covers_db::rel_key_of(comic, &bucket);
+        if let Some(cached) = crate::covers_db::load_page_index(&bucket, &key)? {
+            if let Ok(idx) = serde_json::from_str::<PageIndex>(&cached) {
+                if idx.pw == PREVIEW_WIDTH {
+                    return Ok(idx);
+                }
+            }
+        }
+        let idx = build_page_index(comic)?;
+        let data = serde_json::to_string(&idx).map_err(|e| format!("序列化失败: {e}"))?;
+        let _ = crate::covers_db::save_page_index(&bucket, &key, &data);
+        return Ok(idx);
+    }
+    build_page_index(comic)
+}
+
+/// 有手动裁剪参数（cover_crop_offset）时，用该偏移重新生成手动封面并缓存。
+/// 返回 true 表示已生成并写库（调用方直接返回结果即可）。
+fn regenerate_manual_cover(
+    comic: &Comic,
+    bucket: &str,
+    key: &str,
+    configs: &std::collections::HashMap<String, String>,
+) -> Option<CoverData> {
+    let offset_str = configs.get("cover_crop_offset")?;
+    let offset = offset_str.trim().parse::<u32>().ok()?;
+    let idx = cached_page_index(comic).ok()?;
+    let (data, mime, w, h) = generate_cropped_cover(comic, &idx, offset, COVER_SIZE).ok()?;
+    let _ = crate::covers_db::save_cover(bucket, key, &data, &mime, w as i64, h as i64);
+    // 标记已按偏移生成，避免每次请求重复重建
+    let mut cfg = configs.clone();
+    cfg.insert("cover_from_offset".to_string(), "1".to_string());
+    let _ = crate::covers_db::save_configs(bucket, key, &cfg);
+    Some(CoverData {
+        data,
+        mime,
+        width: w as i64,
+        height: h as i64,
+    })
+}
+
 /// 获取封面（漫画本体外部封面库唯一来源，其次 cover.* 文件 / 第一页）。
 /// series 无自身封面时回退到第一章封面。
 pub fn get_cover(comic: &Comic) -> Result<CoverData, String> {
     // 1. 本体外部封面库（唯一来源），key 为相对本体目录的路径
     if let Some(bucket) = crate::covers_db::bucket_dir(comic) {
         let key = crate::covers_db::rel_key_of(comic, &bucket);
-        if let Ok(Some((data, mime, w, h))) = crate::covers_db::load_cover(&bucket, &key)
-        {
+        let configs = crate::covers_db::load_configs(&bucket, &key).unwrap_or_default();
+        let has_offset = configs.contains_key("cover_crop_offset");
+        let already_offset = configs.get("cover_from_offset").map(|s| s.as_str()) == Some("1");
+        if let Ok(Some((data, mime, w, h))) = crate::covers_db::load_cover(&bucket, &key) {
+            // 无手动裁剪参数，或已按偏移生成过 → 直接用库里的封面
+            if !has_offset || already_offset {
+                return Ok(CoverData {
+                    data,
+                    mime,
+                    width: w,
+                    height: h,
+                });
+            }
+            // 有手动裁剪参数但库里的还是旧默认图（如迁移导入的 webp）→ 用偏移重新生成
+            if let Some(cover) = regenerate_manual_cover(comic, &bucket, &key, &configs) {
+                return Ok(cover);
+            }
+            // 重新生成失败也返回现有封面，避免空手
             return Ok(CoverData {
                 data,
                 mime,
                 width: w,
                 height: h,
             });
+        }
+        // 1b. 封面缺失但保存过手动裁剪参数（cover_crop_offset）→ 用该偏移重新生成
+        // 手动封面，绝不回退成默认第一页图（手动设置几百章的封面不能被扫描/异常重置）。
+        if let Some(cover) = regenerate_manual_cover(comic, &bucket, &key, &configs) {
+            return Ok(cover);
         }
     }
 

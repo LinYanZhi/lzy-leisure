@@ -274,6 +274,24 @@ pub fn save_configs(
     })
 }
 
+/// 删除某漫画的若干参数（只删给定 key，其余保留，如阅读进度 scroll_pct）
+pub fn delete_config_keys(bucket_dir: &str, key: &str, keys: &[&str]) -> Result<(), String> {
+    if keys.is_empty() {
+        return Ok(());
+    }
+    with_conn(bucket_dir, |conn| {
+        let ph = keys.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        conn.execute(
+            &format!("DELETE FROM configs WHERE path = ?1 AND key IN ({ph})"),
+            rusqlite::params_from_iter(
+                std::iter::once(key.to_string()).chain(keys.iter().map(|s| s.to_string())),
+            ),
+        )
+        .map_err(|e| format!("删除参数失败: {e}"))?;
+        Ok(())
+    })
+}
+
 // ══════════════════════════════════════════════════════════
 //  page_indices：章节页面条带索引缓存
 // ══════════════════════════════════════════════════════════
@@ -355,6 +373,13 @@ pub fn save_preview(
 pub fn purge_missing(bucket_dir: &str, valid_paths: &[String]) -> Result<(), String> {
     with_conn(bucket_dir, |conn| {
         let valid: HashSet<&str> = valid_paths.iter().map(|s| s.as_str()).collect();
+        // 手动封面参数键：存在即视为用户显式配置过该章节封面
+        let manual_keys = [
+            "cover_crop_offset",
+            "cover_crop_y",
+            "cover_pdf_page",
+            "cover_pdf_offset",
+        ];
         // 各表都按 path 键组织，统一清理不在有效集合中的 path（configs 除外）
         for table in ["covers", "page_indices", "previews"] {
             let sql = format!("SELECT DISTINCT path FROM {table}");
@@ -372,6 +397,26 @@ pub fn purge_missing(bucket_dir: &str, valid_paths: &[String]) -> Result<(), Str
                 .cloned()
                 .collect();
             for p in stale {
+                // 用户手动配置过的封面绝不删除：即使当前 key 基准暂时失配，
+                // 也保留等待复用，避免手动设置大面积丢失（宁可残留也不误删）
+                if table == "covers" {
+                    let manual_ph = manual_keys.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+                    let manual = conn
+                        .query_row(
+                            &format!(
+                                "SELECT 1 FROM configs WHERE path = ?1 AND key IN ({manual_ph}) LIMIT 1"
+                            ),
+                            rusqlite::params_from_iter(
+                                std::iter::once(p.clone()).chain(manual_keys.iter().map(|s| s.to_string())),
+                            ),
+                            |_| Ok(()),
+                        )
+                        .optional()
+                        .map_err(|e| format!("查询手动封面参数失败: {e}"))?;
+                    if manual.is_some() {
+                        continue;
+                    }
+                }
                 conn.execute(&format!("DELETE FROM {table} WHERE path = ?1"), params![p])
                     .map_err(|e| format!("清理封面库失败: {e}"))?;
             }
@@ -380,12 +425,20 @@ pub fn purge_missing(bucket_dir: &str, valid_paths: &[String]) -> Result<(), Str
     })
 }
 
-/// 扫描完成后按本体分组清理残留条目，并使归属缓存失效
-pub fn purge_after_scan(comics: &[Comic]) {
+/// 扫描完成后按本体分组清理残留条目，并使归属缓存失效。
+/// 有效键集一律基于**全量漫画记录**计算（而非本次扫描切片）：
+/// `bucket_of` 需要完整的父链（series_id → 容器）才能正确归属，若只用切片
+/// （如单章重扫、切片缺父记录）会把仍有章节的封面误判为残留并删除，造成
+/// 用户手动封面大面积丢失。全量计算保证：只有真正从库中消失的章节才被清理。
+pub fn purge_after_scan(_scanned: &[Comic]) {
+    let all = match crate::db::comics::load_all_comics() {
+        Ok(a) => a,
+        Err(_) => return,
+    };
     let by_id: HashMap<String, Comic> =
-        comics.iter().map(|c| (c.id.clone(), c.clone())).collect();
+        all.iter().map(|c| (c.id.clone(), c.clone())).collect();
     let mut buckets: HashMap<String, Vec<String>> = HashMap::new();
-    for c in comics {
+    for c in &all {
         if let Some(b) = bucket_of(&by_id, c) {
             // 有效集合用新基准：记录相对本体目录的 key
             buckets.entry(b.clone()).or_default().push(rel_key_of(c, &b));
