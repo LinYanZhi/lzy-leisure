@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // 休闲时光 - 目录 / 文件选择（原 api.ts 拆分）
 // 桌面用系统对话框（Tauri dialog），浏览器用后端目录浏览弹窗。
 // ============================================================
@@ -153,14 +153,37 @@ export function pickFile(title: string): Promise<string | null> {
       typeof r === "string" ? r : null,
     );
   }
-  return openFilePicker(title);
+  return openFilePicker(title, VIDEO_EXTS, "🎬");
 }
 
-/** 浏览器模式：文件选择弹窗（列出视频扩展名文件） */
-function openFilePicker(title: string): Promise<string | null> {
-  const VIDEO_EXTS = new Set([
-    "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "m4v", "ts", "rmvb", "mpg", "mpeg",
-  ]);
+/** 选择小说文件（EPUB / TXT）：桌面走系统对话框带过滤器，浏览器列出 epub/txt */
+export function pickNovelFile(title: string): Promise<string | null> {
+  if (!isWeb) {
+    return open({
+      directory: false,
+      multiple: false,
+      title,
+      filters: [
+        { name: "小说", extensions: ["epub", "txt"] },
+        { name: "所有文件", extensions: ["*"] },
+      ],
+    }).then((r) => (typeof r === "string" ? r : null));
+  }
+  return openFilePicker(title, NOVEL_EXTS, "📖");
+}
+
+const VIDEO_EXTS = new Set([
+  "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "m4v", "ts", "rmvb", "mpg", "mpeg",
+]);
+
+const NOVEL_EXTS = new Set(["epub", "txt"]);
+
+/** 浏览器模式：文件选择弹窗（列出指定扩展名文件） */
+function openFilePicker(
+  title: string,
+  exts: Set<string>,
+  emoji: string,
+): Promise<string | null> {
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
     overlay.style.cssText =
@@ -237,9 +260,9 @@ function openFilePicker(title: string): Promise<string | null> {
           const files = (res as unknown as { files?: FsEntry[] }).files || [];
           for (const f of files) {
             const ext = f.name.split(".").pop()?.toLowerCase() || "";
-            if (!VIDEO_EXTS.has(ext)) continue;
+            if (!exts.has(ext)) continue;
             const row = document.createElement("div");
-            row.textContent = "🎬 " + f.name;
+            row.textContent = `${emoji} ` + f.name;
             row.style.cssText =
               "padding:8px 12px;border-radius:6px;cursor:pointer;font-size:14px;color:#7ee787;";
             row.addEventListener("mouseenter", () => (row.style.background = "#2a2a2a"));

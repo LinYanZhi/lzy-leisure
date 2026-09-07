@@ -208,7 +208,7 @@ fn migrate(conn: &Connection) -> Result<(), String> {
             updated_at  TEXT NOT NULL DEFAULT ''
         );
 
-        -- ── 小说（预留） ──
+        -- ── 小说（EPUB / TXT） ──
         CREATE TABLE IF NOT EXISTS novels (
             id          TEXT PRIMARY KEY,
             title       TEXT NOT NULL,
@@ -221,6 +221,8 @@ fn migrate(conn: &Connection) -> Result<(), String> {
             created_at  TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
         );
+        -- upsert_novel 按 path 幂等（ON CONFLICT(path)），path 必须唯一
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_novels_path ON novels(path);
 
         -- ── 故事会（单一路径：根目录下每个子目录 = 一年，内含 PDF 期数） ──
         -- fingerprint：内容指纹（文件大小 + 前 64KB 哈希），文件改名/移动后不变，

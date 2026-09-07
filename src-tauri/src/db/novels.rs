@@ -187,7 +187,8 @@ pub fn delete_novel(novel_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 删除某个导入路径下磁盘已不存在的书（重扫后保持一致性），返回删除数量
+/// 删除某个导入路径下磁盘已不存在的书（重扫后保持一致性），返回删除数量。
+/// 注意：不能持锁调用 delete_novel（Mutex 不可重入），改为在本事务内直接删除。
 pub fn delete_novels_not_in(root_dir: &str, keep_paths: &[String]) -> Result<usize, String> {
     let conn = lock()?;
     let mut stmt = conn
@@ -204,18 +205,27 @@ pub fn delete_novels_not_in(root_dir: &str, keep_paths: &[String]) -> Result<usi
             gone.push(r.0);
         }
     }
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("开启事务失败: {e}"))?;
+    let mut removed = 0usize;
     for id in &gone {
-        delete_novel(id)?;
+        tx.execute("DELETE FROM novels WHERE id = ?1", params![id])
+            .map_err(|e| format!("删除书籍失败: {e}"))?;
+        removed += 1;
     }
-    Ok(gone.len())
+    tx.commit().map_err(|e| format!("提交事务失败: {e}"))?;
+    Ok(removed)
 }
 
 /// 更新阅读进度（chapter 为 spine 索引字符串，pos 为章节内字符偏移）
 pub fn set_novel_progress(novel_id: &str, chapter: &str, pos: i64) -> Result<(), String> {
+    // now() 内部会获取数据库锁，必须先于 lock() 调用，避免同一 Mutex 非重入死锁
+    let ts = now();
     let conn = lock()?;
     conn.execute(
         "UPDATE novels SET chapter = ?1, reading_pos = ?2, updated_at = ?3 WHERE id = ?4",
-        params![chapter, pos, now(), novel_id],
+        params![chapter, pos, ts, novel_id],
     )
     .map_err(|e| format!("保存阅读进度失败: {e}"))?;
     Ok(())
@@ -229,10 +239,12 @@ pub fn update_novel_meta(
     chapter_count: i64,
     chapters_json: &str,
 ) -> Result<(), String> {
+    // now() 内部会获取数据库锁，必须先于 lock() 调用，避免同一 Mutex 非重入死锁
+    let ts = now();
     let conn = lock()?;
     conn.execute(
         "UPDATE novels SET title = ?1, author = ?2, chapter_count = ?3, chapters_json = ?4, updated_at = ?5 WHERE id = ?6",
-        params![title, author, chapter_count, chapters_json, now(), novel_id],
+        params![title, author, chapter_count, chapters_json, ts, novel_id],
     )
     .map_err(|e| format!("更新书籍失败: {e}"))?;
     Ok(())
@@ -240,10 +252,12 @@ pub fn update_novel_meta(
 
 /// 记录封面缓存路径（相对应用数据目录）
 pub fn set_novel_cover(novel_id: &str, cover_path: &str) -> Result<(), String> {
+    // now() 内部会获取数据库锁，必须先于 lock() 调用，避免同一 Mutex 非重入死锁
+    let ts = now();
     let conn = lock()?;
     conn.execute(
         "UPDATE novels SET cover_path = ?1, updated_at = ?2 WHERE id = ?3",
-        params![cover_path, now(), novel_id],
+        params![cover_path, ts, novel_id],
     )
     .map_err(|e| format!("保存封面失败: {e}"))?;
     Ok(())
@@ -251,10 +265,12 @@ pub fn set_novel_cover(novel_id: &str, cover_path: &str) -> Result<(), String> {
 
 /// 改名（只改库记录，不碰文件）
 pub fn rename_novel(novel_id: &str, title: &str) -> Result<(), String> {
+    // now() 内部会获取数据库锁，必须先于 lock() 调用，避免同一 Mutex 非重入死锁
+    let ts = now();
     let conn = lock()?;
     conn.execute(
         "UPDATE novels SET title = ?1, updated_at = ?2 WHERE id = ?3",
-        params![title, now(), novel_id],
+        params![title, ts, novel_id],
     )
     .map_err(|e| format!("改名失败: {e}"))?;
     Ok(())

@@ -12,6 +12,7 @@ mod db;
 mod events;
 mod http;
 mod novel_epub;
+mod novel_txt;
 mod scanner;
 mod story_covers;
 mod story_first_page;

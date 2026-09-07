@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useData } from "@glbt/appkit-ui";
 import { api, type Novel } from "../../api";
 import { store } from "../../data";
@@ -145,8 +145,20 @@ export default function NovelReaderView({ novel, onClose }: Props) {
       setLoading(true);
       setError("");
       try {
-        const text = await api.getNovelChapterContent(novel.id, idx);
-        setContent(text);
+        let actualIdx = idx;
+        let text = await api.getNovelChapterContent(novel.id, idx);
+        // 空/占位章自动顺延到下一个有实质内容的章（源文件常见重复标题、仅有标题或
+        // 前言类的占位章，避免打开或切章直接落在空章上显示"文本已结束"）
+        const isPlaceholder = (t: string) => {
+          const s = (t || "").trim();
+          return s.length < 30;
+        };
+        while (isPlaceholder(text) && actualIdx < novel.chapters.length - 1) {
+          actualIdx += 1;
+          text = await api.getNovelChapterContent(novel.id, actualIdx);
+        }
+        if (actualIdx !== idx) setChapterIdx(actualIdx);
+        setContent(text || "");
         // 内容渲染后恢复滚动（双重 rAF 等待布局稳定）
         requestAnimationFrame(() => {
           requestAnimationFrame(() => scrollToOffset(restorePos));

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useData } from "@glbt/appkit-ui";
 import {
   api,
@@ -218,7 +218,7 @@ export default function NovelShelfView({ onOpenNovel }: Props) {
           ))}
         </div>
         <div className="shelf-toolbar-actions">
-          <button className="btn-ghost" onClick={addFile} title="导入单个 EPUB 文件">
+          <button className="btn-ghost" onClick={addFile} title="导入单个 EPUB / TXT 文件">
             + 导入书籍
           </button>
           <button className="btn-ghost" onClick={openManager} title="管理导入的小说文件夹">
@@ -233,7 +233,7 @@ export default function NovelShelfView({ onOpenNovel }: Props) {
         <div className="shelf-empty">
           <p>书架为空</p>
           <p className="muted">
-            点击右上角「小说源管理」添加存放 EPUB 的文件夹，或「+ 导入书籍」导入单个文件
+            点击右上角「小说源管理」添加存放 EPUB / TXT 的文件夹，或「+ 导入书籍」导入单个文件
           </p>
         </div>
       ) : (
@@ -350,7 +350,7 @@ export default function NovelShelfView({ onOpenNovel }: Props) {
             </div>
             <div className="source-footer">
               <button className="btn-ghost" onClick={addFile} disabled={loading}>
-                {loading ? "导入中…" : "+ 导入单个 EPUB"}
+                {loading ? "导入中…" : "+ 导入单个 EPUB / TXT"}
               </button>
               <button className="btn-primary" onClick={addRoot} disabled={loading}>
                 {loading ? "扫描中…" : "+ 添加小说目录"}

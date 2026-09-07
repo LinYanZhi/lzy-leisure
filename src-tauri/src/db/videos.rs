@@ -298,10 +298,18 @@ pub fn delete_videos_not_in(root_dir: &str, keep_paths: &[String]) -> Result<usi
             gone.push(r.0);
         }
     }
+    // 不能持锁调用 delete_video（Mutex 不可重入），改为在本事务内直接删除
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("开启事务失败: {e}"))?;
+    let mut removed = 0usize;
     for id in &gone {
-        delete_video(id)?;
+        tx.execute("DELETE FROM videos WHERE id = ?1", params![id])
+            .map_err(|e| format!("删除视频失败: {e}"))?;
+        removed += 1;
     }
-    Ok(gone.len())
+    tx.commit().map_err(|e| format!("提交事务失败: {e}"))?;
+    Ok(removed)
 }
 
 pub(crate) fn load_relations(conn: &rusqlite::Connection, video: &mut Video) -> rusqlite::Result<()> {

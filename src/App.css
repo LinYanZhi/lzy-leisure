@@ -2492,6 +2492,9 @@
   line-height: 2;
   color: #d5d5d5;
   word-break: break-word;
+  /* 保留原文件段落换行：否则整章 \n 会被折叠成一行超长文本，
+     放大/缩小字号时 WebView2 需要给超长单行重新换行，导致布局卡死 */
+  white-space: pre-wrap;
 }
 
 .novel-content p {

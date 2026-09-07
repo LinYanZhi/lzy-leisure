@@ -1,9 +1,9 @@
-﻿// ============================================================
+// ============================================================
 // 休闲时光 - api 命令集（原 api.ts 拆分）
 // 按业务域分组的统一命令调用；对外经 api.ts 桶文件重导出。
 // ============================================================
 import { call, imgUrl, isWeb } from "./transport";
-import { pickDirectory, pickFile } from "./pickers";
+import { pickDirectory, pickFile, pickNovelFile } from "./pickers";
 import type {
   Actor,
   ActorInput,
@@ -214,7 +214,7 @@ export const api = {
   openNovelFolder: (novelId: string) =>
     call<string>("open_novel_folder", { novel_id: novelId }),
   pickNovelDir: () => pickDirectory("选择小说目录"),
-  pickNovelFile: () => pickFile("选择 EPUB 文件"),
+  pickNovelFile: () => pickNovelFile("选择 EPUB / TXT 文件"),
 
   // ════════════ 小说：导入路径（源） ════════════
   getNovelRoots: () => call<NovelRootDir[]>("get_novel_roots"),

@@ -1,14 +1,23 @@
-//! 小说（EPUB）命令。原 commands.rs 拆分，外部路径 `commands::xxx` 不变。
+//! 小说（EPUB / TXT）命令。原 commands.rs 拆分，外部路径 `commands::xxx` 不变。
 use super::{data_url, mime_from_ext};
 use crate::db::novels as novel_db;
 use std::path::Path;
 
 // ══════════════════════════════════════════════════════════
-//  小说（EPUB：单本即一部书，只读解析，绝不修改原文件）
+//  小说（EPUB / TXT：单本即一部书，只读解析，绝不修改原文件）
 // ══════════════════════════════════════════════════════════
 
-/// 递归收集目录下全部 epub 文件（跳过隐藏目录）
-fn find_epubs(dir: &Path) -> Result<Vec<String>, String> {
+/// 是否为支持的文本格式（TXT 走字节区间章节化，EPUB 走 spine 章节）
+fn is_txt(path: &str) -> bool {
+    path.to_ascii_lowercase().ends_with(".txt")
+}
+
+fn is_epub(path: &str) -> bool {
+    path.to_ascii_lowercase().ends_with(".epub")
+}
+
+/// 递归收集目录下全部 epub / txt 文件（跳过隐藏目录）
+fn find_novel_files(dir: &Path) -> Result<Vec<String>, String> {
     let mut out: Vec<String> = Vec::new();
     let mut stack: Vec<std::path::PathBuf> = vec![dir.to_path_buf()];
     while let Some(cur) = stack.pop() {
@@ -31,9 +40,9 @@ fn find_epubs(dir: &Path) -> Result<Vec<String>, String> {
                 }
                 stack.push(p);
             } else if p.is_file() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                if name.to_ascii_lowercase().ends_with(".epub") {
-                    out.push(p.to_string_lossy().to_string());
+                let s = p.to_string_lossy().to_string();
+                if is_epub(&s) || is_txt(&s) {
+                    out.push(s);
                 }
             }
         }
@@ -42,31 +51,57 @@ fn find_epubs(dir: &Path) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-/// 解析 EPUB → 登记书籍（幂等：按 path 匹配，不覆盖阅读进度）
+/// 解析并登记一本书（幂等：按 path 匹配，不覆盖阅读进度）。EPUB / TXT 统一走此入口。
 fn register_novel_impl(path: &Path, root_dir: &str) -> Result<novel_db::Novel, String> {
-    let meta = crate::novel_epub::parse_epub(path)?;
-    let chapters: Vec<novel_db::NovelChapter> = meta
-        .chapters
-        .iter()
-        .enumerate()
-        .map(|(i, c)| novel_db::NovelChapter {
-            id: i as i64,
-            title: c.title.clone(),
-            href: c.href.clone(),
-        })
-        .collect();
-    let title = if meta.title.trim().is_empty() {
-        path.file_stem()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_default()
+    let p_str = path.to_string_lossy().to_string();
+    let chapters: Vec<novel_db::NovelChapter>;
+    let mut title: String;
+    let author: String;
+
+    if is_txt(&p_str) {
+        // TXT：字节区间章节化，href 编码 `txt:{encoding}:{offset}:{len}`
+        let meta = crate::novel_txt::parse_txt(path)?;
+        title = meta.title;
+        author = meta.author;
+        chapters = meta
+            .chapters
+            .iter()
+            .enumerate()
+            .map(|(i, c)| novel_db::NovelChapter {
+                id: i as i64,
+                title: c.title.clone(),
+                href: format!("txt:{}:{}:{}", meta.encoding, c.offset, c.len),
+            })
+            .collect();
+    } else if is_epub(&p_str) {
+        let meta = crate::novel_epub::parse_epub(path)?;
+        title = meta.title;
+        author = meta.author;
+        chapters = meta
+            .chapters
+            .iter()
+            .enumerate()
+            .map(|(i, c)| novel_db::NovelChapter {
+                id: i as i64,
+                title: c.title.clone(),
+                href: c.href.clone(),
+            })
+            .collect();
     } else {
-        meta.title.trim().to_string()
-    };
+        return Err("仅支持 EPUB / TXT 文件".to_string());
+    }
+
+    if title.trim().is_empty() {
+        title = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+    }
     let novel = novel_db::Novel {
         id: crate::db::new_video_id(),
         title,
-        author: meta.author.trim().to_string(),
-        path: path.to_string_lossy().to_string(),
+        author: author.trim().to_string(),
+        path: p_str,
         cover_path: String::new(),
         reading_pos: 0,
         chapter: String::new(),
@@ -148,10 +183,10 @@ pub(crate) async fn rescan_novel_root(path: String) -> Result<String, String> {
     .map_err(|e| format!("扫描任务失败: {e}"))?
 }
 
-/// 共享扫描实现：登记目录下全部 EPUB，移除磁盘上已不存在的书
+/// 共享扫描实现：登记目录下全部 EPUB/TXT，移除磁盘上已不存在的书
 fn scan_novel_root_impl(dir: &Path) -> Result<(i64, i64), String> {
     let root = dir.to_string_lossy().to_string();
-    let files = find_epubs(dir)?;
+    let files = find_novel_files(dir)?;
     let mut new_count = 0i64;
     for f in &files {
         if novel_db::get_novel_by_path(f)?.is_some() {
@@ -176,15 +211,15 @@ pub(crate) fn get_novel_roots() -> Result<Vec<novel_db::NovelRootDir>, String> {
     novel_db::get_novel_roots()
 }
 
-/// 单文件导入 EPUB（幂等：已导入则直接返回）
+/// 单文件导入 EPUB / TXT（幂等：已导入则直接返回）
 #[tauri::command]
 pub(crate) fn add_novel(path: String) -> Result<String, String> {
     let p = Path::new(&path);
     if !p.is_file() {
         return Err(format!("文件不存在: {path}"));
     }
-    if !path.to_ascii_lowercase().ends_with(".epub") {
-        return Err("仅支持 EPUB 文件".to_string());
+    if !is_epub(&path) && !is_txt(&path) {
+        return Err("仅支持 EPUB / TXT 文件".to_string());
     }
     if novel_db::get_novel_by_path(&path)?.is_some() {
         return Ok("ok".to_string());
@@ -221,6 +256,10 @@ pub(crate) fn rename_novel(novel_id: String, title: String) -> Result<(), String
 /// 小说封面字节（HTTP 流式接口与 data URL 命令共用；从 EPUB 内嵌封面提取，缓存到应用数据目录）
 pub(crate) fn novel_cover_bytes(novel_id: &str) -> Result<(String, Vec<u8>), String> {
     let novel = novel_db::get_novel(novel_id)?.ok_or_else(|| "书籍不存在".to_string())?;
+    // TXT 小说没有内嵌封面，直接返回占位错误（前端显示占位图）
+    if is_txt(&novel.path) {
+        return Err("TXT 小说无内嵌封面".to_string());
+    }
     // 1. 已有封面缓存
     if !novel.cover_path.is_empty() {
         let p = crate::app_data_dir().join(&novel.cover_path);
@@ -248,7 +287,7 @@ pub(crate) fn get_novel_cover_data_url(novel_id: String) -> Result<String, Strin
     Ok(data_url(&mime, &bytes))
 }
 
-/// 读取章节纯文本（只读原文件）
+/// 读取章节纯文本（只读原文件；TXT 按字节区间读取，EPUB 按 spine href 读取）
 #[tauri::command]
 pub(crate) fn get_novel_chapter_content(novel_id: String, chapter_index: i64) -> Result<String, String> {
     let novel = novel_db::get_novel(&novel_id)?.ok_or_else(|| "书籍不存在".to_string())?;
@@ -256,6 +295,18 @@ pub(crate) fn get_novel_chapter_content(novel_id: String, chapter_index: i64) ->
         .chapters
         .get(chapter_index as usize)
         .ok_or_else(|| "章节不存在".to_string())?;
+    // TXT：href = `txt:{encoding}:{offset}:{len}`，按字节区间读取并解码
+    if let Some(rest) = ch.href.strip_prefix("txt:") {
+        let parts: Vec<&str> = rest.splitn(3, ':').collect();
+        if parts.len() != 3 {
+            return Err("章节数据异常".to_string());
+        }
+        let enc = parts[0];
+        let offset = parts[1].parse::<u64>().map_err(|_| "章节数据异常".to_string())?;
+        let len = parts[2].parse::<u64>().map_err(|_| "章节数据异常".to_string())?;
+        return crate::novel_txt::read_chapter(Path::new(&novel.path), enc, offset, len);
+    }
+    // EPUB
     crate::novel_epub::read_chapter_text(Path::new(&novel.path), &ch.href)
 }
 
