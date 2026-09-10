@@ -311,6 +311,13 @@ async fn inner_dispatch(cmd: &str, p: &Value) -> Result<Value, String> {
 
         // ── 视频：演员 ──
         "list_actors" => c::list_actors().map(to_value),
+        "list_actors_with_counts" => c::list_actors_with_counts().map(to_value),
+        "import_actors_batch" => {
+            let actors: Vec<c::ActorInput> =
+                req_opt(p, "actors")?.ok_or_else(|| "缺少参数: actors".to_string())?;
+            c::import_actors_batch(actors)
+                .map(|n| Value::from(n as i64))
+        }
         "save_actor" => {
             let input: c::ActorInput = req_opt(p, "input")?.ok_or_else(|| "缺少参数: input".to_string())?;
             c::save_actor(input).map(to_value)

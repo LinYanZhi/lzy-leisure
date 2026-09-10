@@ -1388,6 +1388,187 @@
   border-color: var(--accent);
 }
 
+/* 卡片"⋯"更多按钮：手机常显右上角，桌面悬停显示 */
+.vs-card-more {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.vs-card:hover .vs-card-more,
+.vs-card-more:focus-visible {
+  opacity: 1;
+}
+
+.vs-card-more:hover {
+  background: var(--accent);
+}
+
+@media (max-width: 768px) {
+  /* 手机端无 hover，⋯ 常显 */
+  .vs-card-more {
+    opacity: 1;
+  }
+}
+
+/* ── 继续观看横排 ── */
+.vs-continue {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 4px 14px;
+  flex-shrink: 0;
+}
+
+.vs-continue-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.vs-continue-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 2px 6px;
+}
+
+.vs-continue-row::-webkit-scrollbar {
+  display: none;
+}
+
+.vs-continue-card {
+  flex: 0 0 200px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.vs-continue-card:hover {
+  background: var(--bg-card-hover);
+}
+
+.vs-continue-cover {
+  position: relative;
+}
+
+.vs-continue-time {
+  position: absolute;
+  right: 6px;
+  bottom: 18px;
+  z-index: 2;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  padding: 1px 5px;
+  pointer-events: none;
+}
+
+.vs-continue-name {
+  min-height: 0;
+  -webkit-line-clamp: 1;
+  font-size: 12px;
+}
+
+/* ── 卡片操作菜单（手机底部弹出 / 桌面居中） ── */
+.vs-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.vs-menu-sheet {
+  width: 100%;
+  max-width: 360px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vs-menu-title {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 8px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.vs-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.vs-menu-item:hover {
+  background: var(--bg-card-hover);
+}
+
+.vs-menu-danger:hover {
+  background: rgba(224, 85, 85, 0.15);
+  color: var(--error);
+}
+
+.vs-menu-cancel {
+  margin-top: 4px;
+  padding: 11px;
+  border: none;
+  border-radius: 8px;
+  background: var(--bg-badge, rgba(0, 0, 0, 0.3));
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .vs-menu-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .vs-menu-sheet {
+    max-width: none;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  .vs-continue-card {
+    flex-basis: 160px;
+  }
+}
+
 .vs-title {
   margin-top: 6px;
   font-size: 13px;
@@ -1673,6 +1854,112 @@
   padding: 8px 16px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  transition: opacity 0.25s, transform 0.25s;
+}
+
+/* 移动端控制栏自动隐藏 */
+.pv-topbar-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-100%);
+}
+
+/* 双击 seek 提示（屏幕中央 toast） */
+.pv-seek-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 10px;
+  padding: 10px 18px;
+  pointer-events: none;
+  animation: pv-seek-pop 0.9s ease forwards;
+}
+
+@keyframes pv-seek-pop {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15); }
+}
+
+/* ── 迷你播放器（返回不杀播放：悬浮小窗） ── */
+.pv-mini {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 60;
+  width: 220px;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+}
+
+.pv-mini .pv-video-wrap {
+  padding: 0;
+  gap: 0;
+  background: #000;
+}
+
+.pv-mini .pv-video {
+  border-radius: 0;
+}
+
+.pv-mini-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: #111;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pv-mini-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: #ddd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-mini-close {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pv-mini-close:hover {
+  background: rgba(224, 85, 85, 0.8);
+}
+
+@media (max-width: 768px) {
+  /* 手机端：底部避开 app 模块导航栏 */
+  .pv-mini {
+    right: 8px;
+    bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+    width: 170px;
+  }
 }
 
 .pv-title {
@@ -2092,6 +2379,161 @@
   gap: 10px;
 }
 
+.av-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 演员卡片上的操作按钮（编辑 / 删除），悬停显示 */
+.av-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.av-card:hover .av-actions {
+  opacity: 1;
+}
+
+.av-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: var(--bg-badge, rgba(0, 0, 0, 0.4));
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.av-btn:hover {
+  background: rgba(90, 144, 217, 0.25);
+  color: var(--accent);
+}
+
+.av-btn.av-danger:hover {
+  background: rgba(224, 85, 85, 0.2);
+  color: var(--error);
+}
+
+/* 通用提示信息（导入结果等） */
+.vs-hint {
+  font-size: 12px;
+  color: var(--accent, #4a90d9);
+  padding: 2px 0;
+}
+
+/* ═══════════════ 视频：演员详情页（点演员看全部影片） ═══════════════ */
+
+.adv-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 14px 20px;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.adv-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.adv-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adv-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.adv-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.adv-avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.adv-avatar-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--text-badge);
+  background: var(--bg-avatar-placeholder);
+  box-sizing: border-box;
+}
+
+.adv-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.adv-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.adv-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.adv-bio {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.adv-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.adv-grid {
+  flex: 1;
+  min-height: 0;
+}
+
 /* ═══════════════ 视频：标签页 ═══════════════ */
 
 .tv-page {
@@ -2355,11 +2797,23 @@
   .vs-page {
     padding: 12px;
   }
-  /* 演员 / 标签页：内边距收窄，工具条不挤 */
+  /* 演员 / 标签 / 演员详情页：内边距收窄，工具条不挤 */
   .av-page,
-  .tv-page {
+  .tv-page,
+  .adv-page {
     padding: 12px;
     gap: 10px;
+  }
+  /* 演员详情：资料卡头像缩小，影片网格两列 */
+  .adv-avatar,
+  .adv-avatar-empty {
+    width: 64px;
+    height: 64px;
+    font-size: 24px;
+  }
+  .adv-hero {
+    padding: 10px 12px;
+    gap: 12px;
   }
   .vs-grid,
   .vs-series-grid {
@@ -2891,6 +3345,90 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* ── 详情页浏览态 ── */
+.vdt-title-lg {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.vdt-play-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+}
+
+.vdt-play-main {
+  padding: 10px 22px;
+  font-size: 15px;
+}
+
+.vdt-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.vdt-line-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding-top: 3px;
+  min-width: 32px;
+}
+
+.vdt-plate {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.vdt-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.vdt-actor-chip {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 封面上的续播进度条 */
+.vdt-progress {
+  height: 4px;
+  width: 100%;
+  background: var(--bg-badge);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.vdt-progress-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+@media (max-width: 768px) {
+  /* 移动端详情：封面在上、信息在下；信息列不设左右栏 */
+  .vdt-hero {
+    flex-direction: column;
+  }
+  .vdt-cover {
+    width: 100%;
+    max-width: 100%;
+  }
+  .vdt-title-lg {
+    font-size: 16px;
+  }
 }
 
 .vdt-path {

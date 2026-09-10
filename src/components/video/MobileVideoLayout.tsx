@@ -1,6 +1,7 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import type { VideoRootDir } from "../../api";
 import VideoSidebar, { type VideoPage } from "./VideoSidebar";
+import { VIDEO_KINDS } from "./kinds";
 
 interface Props {
   page: VideoPage;
@@ -11,10 +12,11 @@ interface Props {
   children: React.ReactNode;
 }
 
-/** 顶部二级导航项：手机端一屏可达的常用页面 */
-const BOTTOM_NAV: { page: VideoPage; label: string }[] = [
+/** 顶部二级导航项：手机端一屏可达的常用页面（分类也在此，AV 1 键直达） */
+const TOP_NAV: { page: VideoPage; label: string }[] = [
   { page: { name: "all" }, label: "全部" },
   { page: { name: "series" }, label: "剧集" },
+  ...VIDEO_KINDS.map((k) => ({ page: { name: "kind", kind: k.id } as VideoPage, label: k.label })),
   { page: { name: "actors" }, label: "演员" },
   { page: { name: "tags" }, label: "标签" },
 ];
@@ -43,15 +45,20 @@ export default function MobileVideoLayout({
   return (
     <div className="v-module v-module-mobile">
       <div className="vm-secnav">
-        {BOTTOM_NAV.map((item) => (
-          <button
-            key={item.label}
-            className={`vm-sec-item${page.name === item.page.name ? " active" : ""}`}
-            onClick={() => go(item.page)}
-          >
-            {item.label}
-          </button>
-        ))}
+        {TOP_NAV.map((item) => {
+          const active =
+            page.name === item.page.name &&
+            (item.page.name !== "kind" || (page.name === "kind" && page.kind === item.page.kind));
+          return (
+            <button
+              key={item.label}
+              className={`vm-sec-item${active ? " active" : ""}`}
+              onClick={() => go(item.page)}
+            >
+              {item.label}
+            </button>
+          );
+        })}
         <button
           className={`vm-sec-item${drawerOpen ? " active" : ""}`}
           onClick={() => setDrawerOpen(true)}

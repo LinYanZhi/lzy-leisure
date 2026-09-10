@@ -144,6 +144,41 @@ pub struct VideoFilter {
     pub series_id: Option<String>,
 }
 
+/// 批量加载视频的演员/标签关联（list_videos 用）。
+/// 一次性读全表再按 id 分组，避免逐视频查询；顺带修复了
+/// 「列表查询不加载关联 → 按演员/标签过滤永远匹配不到」的旧问题。
+fn load_relations_batch(conn: &rusqlite::Connection, videos: &mut [Video]) -> rusqlite::Result<()> {
+    let mut actor_map: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    {
+        let mut st = conn.prepare("SELECT video_id, actor_id FROM video_actors")?;
+        let rows = st.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+        })?;
+        for r in rows {
+            let (vid, aid) = r?;
+            actor_map.entry(vid).or_default().push(aid);
+        }
+    }
+    let mut tag_map: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    {
+        let mut st = conn.prepare("SELECT video_id, tag_id FROM video_tags")?;
+        let rows = st.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+        })?;
+        for r in rows {
+            let (vid, tid) = r?;
+            tag_map.entry(vid).or_default().push(tid);
+        }
+    }
+    for v in videos.iter_mut() {
+        v.actors = actor_map.remove(&v.id).unwrap_or_default();
+        v.tags = tag_map.remove(&v.id).unwrap_or_default();
+    }
+    Ok(())
+}
+
 /// 列表查询（含演员/标签聚合），按 sort_order 排序
 pub fn list_videos(filter: &VideoFilter) -> Result<Vec<Video>, String> {
     let conn = lock()?;
@@ -174,6 +209,8 @@ pub fn list_videos(filter: &VideoFilter) -> Result<Vec<Video>, String> {
     for r in rows {
         videos.push(r.map_err(|e| format!("解析视频失败: {e}"))?);
     }
+    // 加载演员/标签关联（供前端展示与下方内存过滤）
+    load_relations_batch(&conn, &mut videos).map_err(|e| format!("读取关联失败: {e}"))?;
 
     // 标签/演员/种类/导入路径/剧集筛选（内存过滤，数据量小）
     if !filter.tag_ids.is_empty()
@@ -435,6 +472,99 @@ pub fn update_video_scan_meta(
     )
     .map_err(|e| format!("更新视频扫描元信息失败: {e}"))?;
     Ok(())
+}
+
+/// 追加演员关联（INSERT OR IGNORE，幂等；用于扫描时自动识别演员）
+pub fn link_video_actors(video_id: &str, actor_ids: &[String]) -> Result<(), String> {
+    let conn = lock()?;
+    let mut stmt = conn
+        .prepare("INSERT OR IGNORE INTO video_actors (video_id, actor_id) VALUES (?1, ?2)")
+        .map_err(|e| format!("准备演员关联失败: {e}"))?;
+    for aid in actor_ids {
+        stmt.execute(params![video_id, aid])
+            .map_err(|e| format!("保存演员关联失败: {e}"))?;
+    }
+    Ok(())
+}
+
+/// 更新番号（仅写入传入值；扫描时用于补全空车牌）
+pub fn update_video_license_plate(video_id: &str, plate: &str) -> Result<(), String> {
+    let ts = crate::db::now();
+    let conn = lock()?;
+    conn.execute(
+        "UPDATE videos SET license_plate = ?1, updated_at = ?2 WHERE id = ?3",
+        params![plate, ts, video_id],
+    )
+    .map_err(|e| format!("更新番号失败: {e}"))?;
+    Ok(())
+}
+
+/// 按扫描结果校准种类（只处理"未手动调整"的情况）：
+/// - 当前已含 av → 不动（用户可能手动调整过）；
+/// - 当前为空 → 写入扫描结果；
+/// - 当前有种类但缺 av → 追加 av，并去掉自动推断的 movie（长片 JAV 不应归入"电影"）。
+pub fn reconcile_scan_kinds(video_id: &str, scanned: &[String]) -> Result<(), String> {
+    let ts = crate::db::now();
+    let conn = lock()?;
+    let cur_raw: String = conn
+        .query_row(
+            "SELECT kinds FROM videos WHERE id = ?1",
+            params![video_id],
+            |r| r.get(0),
+        )
+        .map_err(|e| format!("读取种类失败: {e}"))?;
+    let cur: Vec<String> = serde_json::from_str(&cur_raw).unwrap_or_default();
+    if cur.iter().any(|k| k == crate::video_scanner::KIND_AV) {
+        return Ok(());
+    }
+    let next: Vec<String> = if cur.is_empty() {
+        scanned.to_vec()
+    } else {
+        // 已有种类但缺 av：追加 av，并去掉自动推断的 movie
+        let mut merged: Vec<String> = cur
+            .into_iter()
+            .filter(|k| k != crate::video_scanner::KIND_MOVIE)
+            .collect();
+        for k in scanned {
+            if !merged.iter().any(|m| m == k) {
+                merged.push(k.clone());
+            }
+        }
+        merged
+    };
+    conn.execute(
+        "UPDATE videos SET kinds = ?1, updated_at = ?2 WHERE id = ?3",
+        params![
+            serde_json::to_string(&next).unwrap_or_else(|_| "[]".into()),
+            ts,
+            video_id
+        ],
+    )
+    .map_err(|e| format!("写入种类失败: {e}"))?;
+    Ok(())
+}
+
+/// 演员列表 + 各自关联的视频数（演员卡片展示：名字 + 作品数）
+pub fn list_actors_with_counts() -> Result<Vec<(Actor, i64)>, String> {
+    let actors = list_actors()?;
+    let conn = lock()?;
+    let mut stmt = conn
+        .prepare("SELECT actor_id, COUNT(*) FROM video_actors GROUP BY actor_id")
+        .map_err(|e| format!("统计演员作品数失败: {e}"))?;
+    let rows = stmt
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))
+        .map_err(|e| format!("读取演员作品数失败: {e}"))?;
+    let mut counts: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    for r in rows.flatten() {
+        counts.insert(r.0, r.1);
+    }
+    Ok(actors
+        .into_iter()
+        .map(|a| {
+            let n = counts.get(&a.id).copied().unwrap_or(0);
+            (a, n)
+        })
+        .collect())
 }
 
 /// 更新视频媒体元数据（前端按需补全：时长/分辨率/大小/格式）。

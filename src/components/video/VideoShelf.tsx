@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   api,
   onVideoScanDone,
@@ -90,6 +90,20 @@ const ICONS = {
       <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
     </>
   ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8h.01" />
+      <path d="M12 11v5" />
+    </>
+  ),
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    </>
+  ),
 };
 
 /** 当前页面的显示名（主区标题） */
@@ -131,6 +145,8 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
   const [error, setError] = useState("");
   // 封面版本：重新生成封面后 +1 刷新对应卡片
   const [coverRev, setCoverRev] = useState(0);
+  // 卡片"⋯"操作菜单（详情/播放/删除/打开目录）
+  const [menuVideo, setMenuVideo] = useState<Video | null>(null);
 
   // 视频源管理弹窗
   const [showManager, setShowManager] = useState(false);
@@ -389,6 +405,20 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
   const title = pageTitle(page, roots);
   const showSeries = page.name === "series";
 
+  /**
+   * 点卡片默认行为（调研结论：按内容类型分档）：
+   * - AV / 短视频 / 剧集单集（有 series_id）→ 点即播（本项目主力内容，决策成本≈0）
+   * - 电影 / 动漫等长决策内容 → 进详情（主按钮播放，详情始终可从"⋯"菜单进入）
+   */
+  const isPlayFirst = (v: Video) =>
+    v.kinds.includes("av") || v.kinds.includes("short") || !!v.series_id || v.kinds.length === 0;
+
+  /** 卡片点击：按类型分档 */
+  const onCardClick = (v: Video) => {
+    if (isPlayFirst(v)) onPlayVideo(v);
+    else onOpenVideo(v);
+  };
+
   return (
     <div className="vs-page">
       {/* ── 主区工具条：页面名 + 搜索 + 筛选 + 管理 ── */}
@@ -515,43 +545,154 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
           </p>
         </div>
       ) : (
-        <div className="vs-grid">
-          {videos.map((v) => {
-            // 时长放在标题下方小字（meta）里，封面不再叠加角标
-            const meta = [v.duration, resLabel(v.frame_width, v.frame_height), v.year]
-              .filter(Boolean)
-              .join(" · ") || v.file_type;
-            return (
-              <div key={v.id} className="vs-card" onClick={() => onOpenVideo(v)} title={v.title}>
-                <div className="vs-cover-wrap">
-                  <CoverImage videoId={v.id} version={coverRev} className="vs-cover" />
-                  {v.subtitle_path && (
-                    <span className="vs-sub-badge" title="有同名字幕文件">字幕</span>
-                  )}
-                  {v.progress > 0 && v.duration && (
-                    <div
-                      className="vs-progress-bar"
-                      title={`已播放 ${fmtSec(v.progress)} / ${v.duration}`}
-                    >
+        <>
+          {/* ── 继续观看（有进度的视频横排） ── */}
+          {!hasFilters && videos.some((v) => v.progress > 0 && v.duration) && (
+            <div className="vs-continue">
+              <div className="vs-continue-title">继续观看</div>
+              <div className="vs-continue-row">
+                {videos
+                  .filter((v) => v.progress > 0 && v.duration)
+                  .slice(0, 12)
+                  .map((v) => {
+                    const pct = Math.min(100, (v.progress / durToSec(v.duration)) * 100);
+                    return (
                       <div
-                        className="vs-progress-fill"
-                        style={{ width: `${Math.min(100, (v.progress / durToSec(v.duration)) * 100)}%` }}
-                      />
-                    </div>
-                  )}
-                  <div className="vs-card-hover">
-                    {iconBtn("播放", () => onPlayVideo(v), ICONS.play)}
-                    {iconBtn("打开所在目录", () => void openFolder(v), ICONS.folder)}
-                    {iconBtn("重新生成封面", () => void regenerate(v), ICONS.refresh)}
-                    {iconBtn("删除记录", () => void removeVideo(v), ICONS.trash)}
-                  </div>
-                </div>
-                <div className="vs-title" title={v.title}>{v.title}</div>
-                {v.episode && <div className="vs-episode" title="集数">{v.episode}</div>}
-                <div className="vs-meta">{meta}</div>
+                        key={v.id}
+                        className="vs-continue-card"
+                        onClick={() => onPlayVideo(v)}
+                        title={`续播 ${fmtSec(v.progress)} / ${v.duration}`}
+                      >
+                        <div className="vs-cover-wrap vs-continue-cover">
+                          <CoverImage videoId={v.id} version={coverRev} className="vs-cover" />
+                          <div className="vs-progress-bar">
+                            <div className="vs-progress-fill" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="vs-continue-time">{fmtSec(v.progress)}</span>
+                        </div>
+                        <div className="vs-title vs-continue-name" title={v.title}>{v.title}</div>
+                      </div>
+                    );
+                  })}
               </div>
-            );
-          })}
+            </div>
+          )}
+
+          <div className="vs-grid">
+            {videos.map((v) => {
+              // 时长放在标题下方小字（meta）里，封面不再叠加角标
+              const meta = [v.duration, resLabel(v.frame_width, v.frame_height), v.year]
+                .filter(Boolean)
+                .join(" · ") || v.file_type;
+              return (
+                <div key={v.id} className="vs-card" onClick={() => onCardClick(v)} title={v.title}>
+                  <div className="vs-cover-wrap">
+                    <CoverImage videoId={v.id} version={coverRev} className="vs-cover" />
+                    {v.subtitle_path && (
+                      <span className="vs-sub-badge" title="有同名字幕文件">字幕</span>
+                    )}
+                    {v.progress > 0 && v.duration && (
+                      <div
+                        className="vs-progress-bar"
+                        title={`已播放 ${fmtSec(v.progress)} / ${v.duration}`}
+                      >
+                        <div
+                          className="vs-progress-fill"
+                          style={{ width: `${Math.min(100, (v.progress / durToSec(v.duration)) * 100)}%` }}
+                        />
+                      </div>
+                    )}
+                    {/* 卡片"⋯"菜单（手机常显，桌面悬停显示） */}
+                    <button
+                      className="vs-card-more"
+                      title="更多操作"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuVideo(v);
+                      }}
+                    >
+                      {ICONS.more}
+                    </button>
+                    <div className="vs-card-hover">
+                      {iconBtn("播放", () => onPlayVideo(v), ICONS.play)}
+                      {iconBtn("详情", () => onOpenVideo(v), ICONS.info)}
+                      {iconBtn("打开所在目录", () => void openFolder(v), ICONS.folder)}
+                      {iconBtn("重新生成封面", () => void regenerate(v), ICONS.refresh)}
+                      {iconBtn("删除记录", () => void removeVideo(v), ICONS.trash)}
+                    </div>
+                  </div>
+                  <div className="vs-title" title={v.title}>{v.title}</div>
+                  {v.episode && <div className="vs-episode" title="集数">{v.episode}</div>}
+                  <div className="vs-meta">{meta}</div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* ── 卡片操作菜单（手机底部弹出 / 桌面居中） ── */}
+      {menuVideo && (
+        <div
+          className="vs-menu-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setMenuVideo(null);
+          }}
+        >
+          <div className="vs-menu-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="vs-menu-title" title={menuVideo.title}>{menuVideo.title}</div>
+            <button
+              className="vs-menu-item"
+              onClick={() => {
+                const v = menuVideo;
+                setMenuVideo(null);
+                onPlayVideo(v);
+              }}
+            >
+              ▶ 播放
+            </button>
+            <button
+              className="vs-menu-item"
+              onClick={() => {
+                const v = menuVideo;
+                setMenuVideo(null);
+                onOpenVideo(v);
+              }}
+            >
+              ℹ 详情 / 编辑
+            </button>
+            <button
+              className="vs-menu-item"
+              onClick={() => {
+                const v = menuVideo;
+                setMenuVideo(null);
+                void openFolder(v);
+              }}
+            >
+              📁 打开所在目录
+            </button>
+            <button
+              className="vs-menu-item"
+              onClick={() => {
+                const v = menuVideo;
+                setMenuVideo(null);
+                void regenerate(v);
+              }}
+            >
+              🔄 重新生成封面
+            </button>
+            <button
+              className="vs-menu-item vs-menu-danger"
+              onClick={() => {
+                const v = menuVideo;
+                setMenuVideo(null);
+                void removeVideo(v);
+              }}
+            >
+              🗑 删除记录
+            </button>
+            <button className="vs-menu-cancel" onClick={() => setMenuVideo(null)}>取消</button>
+          </div>
         </div>
       )}
 

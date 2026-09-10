@@ -1,8 +1,10 @@
-﻿import { useCallback, useEffect, useState } from "react";
-import { api, type Actor } from "../../api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, type Actor, type ActorInput, type ActorWithCount } from "../../api";
 
 interface Props {
   onChanged: () => void;
+  /** 点击演员卡片 → 打开该演员的影片浏览页 */
+  onOpenActor: (actor: Actor) => void;
 }
 
 function AvatarImage({ actor, ver }: { actor: Actor; ver: number }) {
@@ -24,15 +26,18 @@ function AvatarImage({ actor, ver }: { actor: Actor; ver: number }) {
   return <img className="av-avatar" src={src} draggable={false} alt="" />;
 }
 
-export default function ActorsView({ onChanged }: Props) {
-  const [actors, setActors] = useState<Actor[]>([]);
+export default function ActorsView({ onChanged, onOpenActor }: Props) {
+  const [actors, setActors] = useState<ActorWithCount[]>([]);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<Actor | "new" | null>(null);
   const [avatarVer, setAvatarVer] = useState(0);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
     try {
-      setActors(await api.listActors());
+      setActors(await api.listActorsWithCounts());
     } catch (e) {
       setError(String(e));
     }
@@ -52,38 +57,112 @@ export default function ActorsView({ onChanged }: Props) {
     }
   };
 
+  // 从 JSON 文件批量导入演员清单（{ name, stage_names, height, cup_size, birthdate, bio }[]）
+  const importFromFile = async (file: File) => {
+    setImporting(true);
+    setImportMsg("");
+    setError("");
+    try {
+      const text = await file.text();
+      const raw = JSON.parse(text);
+      const list: ActorInput[] = Array.isArray(raw) ? raw : raw.actors;
+      if (!Array.isArray(list) || list.length === 0) throw new Error("文件里没有演员数据");
+      const n = await api.importActorsBatch(
+        list.map((x) => ({
+          name: String(x.name ?? "").trim(),
+          stage_names: Array.isArray(x.stage_names) ? x.stage_names.map(String) : [],
+          height: String(x.height ?? ""),
+          cup_size: String(x.cup_size ?? ""),
+          birthdate: String(x.birthdate ?? ""),
+          bio: String(x.bio ?? ""),
+        })),
+      );
+      setImportMsg(`已导入 ${n} 位演员（重扫视频目录后会自动按文件名匹配演员）`);
+      await refresh();
+      onChanged();
+    } catch (e) {
+      setError(`导入失败：${String(e)}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="av-page">
       <div className="av-toolbar">
         <span className="av-count">演员（{actors.length}）</span>
-        <button className="btn btn-primary" onClick={() => setEditing("new")}>＋ 新增演员</button>
+        <div className="av-toolbar-actions">
+          <button className="btn" onClick={() => fileInputRef.current?.click()} disabled={importing} title="从 JSON 清单批量导入演员">
+            {importing ? "导入中…" : "导入演员"}
+          </button>
+          <button className="btn btn-primary" onClick={() => setEditing("new")}>＋ 新增演员</button>
+        </div>
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void importFromFile(f);
+          e.target.value = "";
+        }}
+      />
 
       {error && <div className="vs-error">{error}</div>}
+      {importMsg && <div className="vs-hint">{importMsg}</div>}
 
       {actors.length === 0 ? (
         <div className="vs-empty">
           <p>演员库为空</p>
-          <p className="muted">点击右上角「新增演员」录入演员信息</p>
+          <p className="muted">
+            点击右上角「导入演员」从 JSON 清单批量录入，或「新增演员」手动录入
+          </p>
         </div>
       ) : (
         <div className="av-grid">
           {actors.map((a) => (
-            <div key={a.id} className="av-card">
-              <div className="av-avatar-wrap" onClick={() => setEditing(a)} title="点击编辑">
+            <div key={a.id} className="av-card" onClick={() => onOpenActor(a)} title={`查看 ${a.name} 的影片`}>
+              <div className="av-avatar-wrap">
                 <AvatarImage actor={a} ver={avatarVer} />
               </div>
-              <div className="av-name" onClick={() => setEditing(a)} title="点击编辑">{a.name}</div>
+              <div className="av-name">{a.name}</div>
+              <div className="av-meta">
+                {a.video_count > 0 ? `${a.video_count} 部影片` : "暂无影片"}
+              </div>
               <div className="av-meta">
                 {[a.stage_names.join(" / "), a.height, a.cup_size].filter(Boolean).join(" · ") || "—"}
               </div>
-              <button className="av-delete" title="删除演员" onClick={() => void remove(a)}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                </svg>
-              </button>
+              <div className="av-actions">
+                <button
+                  className="av-btn"
+                  title="编辑演员资料"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditing(a);
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                    <path d="m15 5 4 4" />
+                  </svg>
+                </button>
+                <button
+                  className="av-btn av-danger"
+                  title="删除演员"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void remove(a);
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                </button>
+              </div>
             </div>
           ))}
         </div>

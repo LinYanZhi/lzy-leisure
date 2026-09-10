@@ -28,6 +28,8 @@ pub(crate) async fn scan_directory(dir: String) -> Result<ScanResult, String> {
 fn scan_video_dir_impl(dir: &Path) -> Result<ScanResult, String> {
     let root = dir.to_string_lossy().to_string();
     let files = video_scanner::scan_videos(dir)?;
+    // 已知演员列表（扫描时用文件名自动识别演员，只读一次）
+    let known_actors = video_db::list_actors().unwrap_or_default();
 
     let mut new_videos: Vec<video_db::Video> = Vec::new();
     let mut new_count = 0i64;
@@ -40,6 +42,8 @@ fn scan_video_dir_impl(dir: &Path) -> Result<ScanResult, String> {
             // 已存在的视频：补登记/更新字幕与归属路径（如上次扫描后新增字幕文件）
             let sub = video_scanner::find_subtitle(Path::new(&path)).unwrap_or_default();
             video_db::update_video_scan_meta(&existing.id, &sub, &root)?;
+            // 元数据补全：空车牌 → 提取写入；无演员 → 文件名识别关联；种类按 AV 校准
+            enrich_existing_video(&existing, &title, &known_actors)?;
             continue;
         }
         // 稳定 id：随机生成（不依赖路径，文件改名/移动后关联不丢）
@@ -87,7 +91,12 @@ fn scan_video_dir_impl(dir: &Path) -> Result<ScanResult, String> {
             video.frame_width,
             video.frame_height,
         );
+        // 自动识别番号 + 演员 + AV 种类
+        let actor_ids = enrich_from_filename(&mut video, &title, &known_actors);
         video_db::upsert_video(&video)?;
+        if !actor_ids.is_empty() {
+            video_db::link_video_actors(&video.id, &actor_ids)?;
+        }
         new_count += 1;
         new_videos.push(video);
     }
@@ -98,6 +107,66 @@ fn scan_video_dir_impl(dir: &Path) -> Result<ScanResult, String> {
         duplicate_count,
         new_videos,
     })
+}
+
+// ── 文件名元数据增强（番号 / 演员 / AV 种类） ──
+
+/// 构建演员匹配条目（id + 主名 + 全部艺名）
+pub(crate) fn actor_matches(actors: &[video_db::Actor]) -> Vec<video_scanner::ActorMatch> {
+    actors
+        .iter()
+        .map(|a| video_scanner::ActorMatch {
+            id: a.id.clone(),
+            names: std::iter::once(a.name.clone())
+                .chain(a.stage_names.iter().cloned())
+                .collect(),
+        })
+        .collect()
+}
+
+/// 从文件名提取番号 + 识别演员 + 自动补 AV 种类，返回识别到的 actor ids。
+/// 只修改 video 的内存字段（不落库）；调用方负责 upsert / 关联写入。
+pub(crate) fn enrich_from_filename(
+    video: &mut video_db::Video,
+    raw_title: &str,
+    known_actors: &[video_db::Actor],
+) -> Vec<String> {
+    let plate = video_scanner::extract_license_plate(raw_title);
+    if !plate.is_empty() && video.license_plate.is_empty() {
+        video.license_plate = plate;
+    }
+    let actor_ids = video_scanner::detect_actor_ids(raw_title, &actor_matches(known_actors));
+    let is_av = !video.license_plate.is_empty() || !actor_ids.is_empty();
+    if is_av {
+        // 长片 JAV 不应自动归入"电影"；AV 独立成类
+        video.kinds.retain(|k| k != video_scanner::KIND_MOVIE);
+        if !video.kinds.iter().any(|k| k == video_scanner::KIND_AV) {
+            video.kinds.push(video_scanner::KIND_AV.to_string());
+        }
+    }
+    actor_ids
+}
+
+/// 已存在视频的元数据补全（重扫时只补缺项，不覆盖手动设置）：
+/// 车牌为空 → 提取写入；无演员 → 文件名识别并关联；种类为空或仅自动"电影"→ 按 AV 校准。
+pub(crate) fn enrich_existing_video(
+    existing: &video_db::Video,
+    raw_title: &str,
+    known_actors: &[video_db::Actor],
+) -> Result<(), String> {
+    let plate = video_scanner::extract_license_plate(raw_title);
+    let has_plate = !existing.license_plate.is_empty() || !plate.is_empty();
+    if existing.license_plate.is_empty() && !plate.is_empty() {
+        video_db::update_video_license_plate(&existing.id, &plate)?;
+    }
+    let actor_ids = video_scanner::detect_actor_ids(raw_title, &actor_matches(known_actors));
+    if existing.actors.is_empty() && !actor_ids.is_empty() {
+        video_db::link_video_actors(&existing.id, &actor_ids)?;
+    }
+    if has_plate || !actor_ids.is_empty() {
+        video_db::reconcile_scan_kinds(&existing.id, &[video_scanner::KIND_AV.to_string()])?;
+    }
+    Ok(())
 }
 
 // ── 视频：导入路径（源）管理 ──
@@ -265,8 +334,9 @@ pub(crate) async fn add_video(path: String) -> Result<video_db::Video, String> {
             .unwrap_or_else(|| "未命名".to_string());
         // 文件名解析：清洗标题杂质，提取年份/集数（标题为空则回退原始文件名）
         let parsed = video_scanner::parse_video_filename(&title);
+        let raw_title = title.clone();
         let clean_title = if parsed.title.is_empty() {
-            title
+            raw_title
         } else {
             parsed.title.clone()
         };
@@ -307,7 +377,13 @@ pub(crate) async fn add_video(path: String) -> Result<video_db::Video, String> {
             video.frame_width,
             video.frame_height,
         );
+        // 自动识别番号 + 演员 + AV 种类
+        let known_actors = video_db::list_actors().unwrap_or_default();
+        let actor_ids = enrich_from_filename(&mut video, &title, &known_actors);
         video_db::upsert_video(&video)?;
+        if !actor_ids.is_empty() {
+            video_db::link_video_actors(&video.id, &actor_ids)?;
+        }
         Ok(video)
     })
     .await

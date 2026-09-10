@@ -10,6 +10,8 @@ pub const KIND_MOVIE: &str = "movie";
 pub const KIND_SHORT: &str = "short";
 pub const KIND_ANIME: &str = "anime";
 pub const KIND_VERTICAL: &str = "vertical";
+/// 成人片（AV）：命中番号或识别到已登记演员时自动打标
+pub const KIND_AV: &str = "av";
 
 /// 由 duration 字符串（HH:MM:SS 或 MM:SS）解析秒数
 fn duration_to_secs(duration: &str) -> f64 {
@@ -53,6 +55,99 @@ pub fn infer_kinds(
         kinds.push(KIND_ANIME.to_string());
     }
     kinds
+}
+
+// ══════════════════════════════════════════════════════════
+//  番号（license plate）提取 与 演员识别
+// ══════════════════════════════════════════════════════════
+
+/// 从文件名提取番号（license plate），如 "IPX-564" / "MD-0190" / "SONE-687"。
+/// 规则：2-6 个字母 + '-' + 3-5 位数字（大小写不敏感，结果统一大写）；
+/// 在原始文件名（含扩展名前的整段）中查找第一个命中；无则返回空串。
+/// 中文/日文等非 ASCII 字符天然不参与字母段匹配。
+pub fn extract_license_plate(stem: &str) -> String {
+    let upper = stem.to_uppercase();
+    let bytes = upper.as_bytes();
+    let len = bytes.len();
+    let mut i = 0usize;
+    while i < len {
+        // 字母段：连续大写 ASCII
+        let mut j = i;
+        while j < len && bytes[j].is_ascii_uppercase() {
+            j += 1;
+        }
+        let letters = j - i;
+        if (2..=6).contains(&letters) && j < len && bytes[j] == b'-' {
+            // 数字段：'-' 之后连续数字
+            let mut k = j + 1;
+            while k < len && bytes[k].is_ascii_digit() {
+                k += 1;
+            }
+            let digits = k - (j + 1);
+            if (3..=5).contains(&digits) {
+                return upper[i..k].to_string();
+            }
+        }
+        i = j + 1;
+    }
+    String::new()
+}
+
+/// 参与演员匹配的演员条目（id + 全部可用名：主名 + 艺名/别名）
+pub struct ActorMatch {
+    pub id: String,
+    pub names: Vec<String>,
+}
+
+/// 归一化演员/文件名文本：移除会把名字拆开的标点（·、・、、、空格、下划线、全角空格），
+/// 用于覆盖 "楓·卡伦"、"鹫尾芽衣,凪光" 这类带分隔符的写法。
+fn normalize_actor_text(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '·' | '・' | '、' | ',' | '，' | ' ' | '_' | '　' => {}
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// 归一化后参与子串匹配的最小长度（字节）——过短的别名/单字不参与归一化匹配，避免误命中
+const MIN_NORM_NAME_BYTES: usize = 2;
+
+/// 从文件名识别已登记演员：对每个演员的主名与全部艺名做子串匹配。
+/// 先做「原始子串」匹配，再做「分隔符归一化后」匹配（处理 · 等拆开名字的写法）。
+/// 任一名字命中即把该演员 id 记入结果（一部作品可有多位演员）。
+pub fn detect_actor_ids(stem: &str, actors: &[ActorMatch]) -> Vec<String> {
+    if actors.is_empty() || stem.is_empty() {
+        return Vec::new();
+    }
+    let lower = stem.to_lowercase();
+    let normalized = normalize_actor_text(&lower);
+    let mut out: Vec<String> = Vec::new();
+    for a in actors {
+        let mut hit = false;
+        for name in &a.names {
+            let n = name.trim().to_lowercase();
+            if n.is_empty() {
+                continue;
+            }
+            if lower.contains(&n) {
+                hit = true;
+                break;
+            }
+            // 归一化匹配（覆盖分隔符拆分）：归一化后名字仍在归一化文件名中出现才命中
+            let nn = normalize_actor_text(&n);
+            if nn.len() >= MIN_NORM_NAME_BYTES && normalized.contains(&nn) {
+                hit = true;
+                break;
+            }
+        }
+        if hit {
+            out.push(a.id.clone());
+        }
+    }
+    out
 }
 
 pub fn is_video_file(name: &str) -> bool {
@@ -420,5 +515,89 @@ pub fn parse_video_filename(stem: &str) -> ParsedVideoName {
         title: title.trim().to_string(),
         year,
         episode,
+    }
+}
+
+// ══════════════════════════════════════════════════════════
+//  单元测试（用片库真实文件名验证番号提取 / 演员识别）
+// ══════════════════════════════════════════════════════════
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn am(id: &str, names: &[&str]) -> ActorMatch {
+        ActorMatch {
+            id: id.to_string(),
+            names: names.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    /// 片库已登记的演员（与 docs/actor-catalog.json 主名/艺名一致）
+    fn library_actors() -> Vec<ActorMatch> {
+        vec![
+            am("kaede-karen", &["枫可怜", "楓カレン", "枫卡伦", "楓卡伦", "凯伦枫", "田中柠檬", "田中レモン", "Karen Kaede", "枫花恋"]),
+            am("akari-tsumugi", &["明里紬", "明里つむぎ", "Akari Tsumugi"]),
+            am("arata-arina", &["新有菜", "桥本有菜", "新ありな", "Hashimoto Arina"]),
+            am("miyoshi-yuka", &["三好佑香", "みよし ゆか", "みよしゆか"]),
+            am("kawakita-saika", &["河北彩花", "河北彩伽", "川北彩香", "Kawakita Saika"]),
+            am("nagi-hikaru", &["凪ひかる", "凪ひかり", "凪光", "汐世", "有栖花あか"]),
+            am("washio-mei", &["鹫尾芽衣", "鷲尾めい", "筧ジュン"]),
+            am("tuntun", &["吞吞"]),
+            am("suzu-honjo", &["本庄铃", "本庄鈴", "Honjo Suzu"]),
+            am("su-chang", &["苏畅"]),
+        ]
+    }
+
+    #[test]
+    fn extract_plate_from_real_filenames() {
+        let cases = [
+            ("[本庄铃-中字] STARS-516 我立刻被新老师迷住了…….mp4", "STARS-516"),
+            ("IPX-564 非常喜欢口交的痴女护士……(田中柠檬) (1).mp4", "IPX-564"),
+            ("MD-0190-1 我是苏畅 我回来了 柔美少女正式回归.mp4", "MD-0190"),
+            ("SONE-968 志堂瑠衣今天上课无法集中精力…….mp4", "SONE-968"),
+            ("SNOS-056 ……川北彩香 - 河北彩花.mp4", "SNOS-056"),
+            ("PZZ-655 Karen Kaede，一位美丽的妻子…….mp4", "PZZ-655"),
+            ("[天使萌] 2025-08-10 1426.mp4", ""),
+            ("old.mp4", ""),
+            ("#吞吞 好身材 热舞合集_哔哩哔哩_bilibili.mp4", ""),
+            ("韩国bj_哔哩哔哩_bilibili.mp4", ""),
+        ];
+        for (name, want) in cases {
+            assert_eq!(extract_license_plate(name), want, "文件名: {name}");
+        }
+    }
+
+    #[test]
+    fn detect_actors_from_real_filenames() {
+        let actors = library_actors();
+        // 命中枫可怜（含括号艺名、中文/日文写法、分隔符拆分写法）
+        for name in [
+            "IPX-305 ……长腿美女枫可怜化身小恶魔……枫可怜 (田中柠檬).mp4",
+            "IPZZ-932 ……——楓·卡伦 - 枫可怜 (田中柠檬).mp4",
+            "IPZZ-353 凯伦枫，一个放荡的护士…… - 枫可怜 (田中柠檬).mp4",
+        ] {
+            let ids = detect_actor_ids(name, &actors);
+            assert!(ids.iter().any(|x| x == "kaede-karen"), "应命中枫可怜: {name} -> {ids:?}");
+        }
+        // 河北彩花：文件名里写的是错译"川北彩香"，应归到河北彩花
+        let ids = detect_actor_ids("SNOS-056 ……川北彩香 - 河北彩花.mp4", &actors);
+        assert!(ids.iter().any(|x| x == "kawakita-saika"), "川北彩香应命中河北彩花: {ids:?}");
+        // 多演员：鹫尾芽衣 + 凪光
+        let ids = detect_actor_ids("……鹫尾芽衣,凪光…….mp4", &actors);
+        assert!(ids.iter().any(|x| x == "washio-mei"));
+        assert!(ids.iter().any(|x| x == "nagi-hikaru"));
+        // 桥本有菜 → 新有菜
+        let ids = detect_actor_ids("[桥本有菜-中字] ABC-123 ……桥本有菜.mp4", &actors);
+        assert!(ids.iter().any(|x| x == "arata-arina"), "{ids:?}");
+        // B站 up主 / 中文创作者
+        assert!(detect_actor_ids("#吞吞 掰腿_哔哩哔哩_bilibili.mp4", &actors).iter().any(|x| x == "tuntun"));
+        assert!(detect_actor_ids("MD-0190-1 我是苏畅…….mp4", &actors).iter().any(|x| x == "su-chang"));
+        // 未登记演员（紫堂るい）不应误匹配任何已登记演员
+        let ids = detect_actor_ids("SONE-968 志堂瑠衣…… - 紫堂るい.mp4", &actors);
+        assert!(ids.is_empty(), "未登记演员不应命中: {ids:?}");
+        // 无演员的普通文件不应命中
+        let ids = detect_actor_ids("星际穿越 (2014) BD国英双语中英双字.mp4", &actors);
+        assert!(ids.is_empty(), "{ids:?}");
     }
 }

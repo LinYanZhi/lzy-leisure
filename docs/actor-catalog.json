@@ -1,0 +1,260 @@
+﻿[
+    {
+        "name":  "明里紬",
+        "stage_names":  [
+                            "明里つむぎ",
+                            "Akari Tsumugi",
+                            "明里䌷"
+                        ],
+        "height":  "157cm",
+        "cup_size":  "B",
+        "birthdate":  "1998-03-31",
+        "bio":  "出道：2017-03 IdeaPocket专属；状态：在役（2025-11 移籍FALENO）；三围：80-58-83 (B)"
+    },
+    {
+        "name":  "三好佑香",
+        "stage_names":  [
+                            "みよし ゆか",
+                            "みよしゆか",
+                            "Miyoshi Yuka"
+                        ],
+        "height":  "168cm",
+        "cup_size":  "D",
+        "birthdate":  "2001-07-07",
+        "bio":  "出道：2025-05-20 Premium专属；状态：在役（新人）；三围：85-59-90 (D)"
+    },
+    {
+        "name":  "新有菜",
+        "stage_names":  [
+                            "桥本有菜",
+                            "新ありな",
+                            "Hashimoto Arina",
+                            "Arata Arina"
+                        ],
+        "height":  "167cm",
+        "cup_size":  "C",
+        "birthdate":  "1996-12-15",
+        "bio":  "出道：2016-03 S1专属；状态：引退（2025-12-31）；三围：84-58-84 (C)"
+    },
+    {
+        "name":  "枫可怜",
+        "stage_names":  [
+                            "楓カレン",
+                            "枫花恋",
+                            "楓花恋",
+                            "田中柠檬",
+                            "田中レモン",
+                            "枫卡伦",
+                            "楓卡伦",
+                            "凯伦枫",
+                            "Karen Kaede",
+                            "楓·卡伦"
+                        ],
+        "height":  "162cm",
+        "cup_size":  "D",
+        "birthdate":  "1999-08-25",
+        "bio":  "出道：2018-12 IdeaPocket专属；状态：在役；三围：82-56-81 (D)"
+    },
+    {
+        "name":  "天使萌",
+        "stage_names":  [
+                            "天使もえ",
+                            "Tenshi Moe"
+                        ],
+        "height":  "155cm",
+        "cup_size":  "D",
+        "birthdate":  "1994-07-10",
+        "bio":  "出道：2014-07 S1专属；状态：引退（2025-06 末）；三围：84-57-82 (D)"
+    },
+    {
+        "name":  "三上悠亚",
+        "stage_names":  [
+                            "三上悠亜",
+                            "Yua Mikami",
+                            "鬼头桃菜"
+                        ],
+        "height":  "159cm",
+        "cup_size":  "G",
+        "birthdate":  "1993-08-16",
+        "bio":  "出道：2015-06 MUTEKI；状态：引退（2023-08）；三围：88-57-83 (G)"
+    },
+    {
+        "name":  "桃乃木香奈",
+        "stage_names":  [
+                            "桃乃木かな",
+                            "桃乃木かな",
+                            "Momogi Kana"
+                        ],
+        "height":  "153cm",
+        "cup_size":  "E",
+        "birthdate":  "1996-12-24",
+        "bio":  "出道：2015-10 IdeaPocket专属；状态：引退（2025-10）；三围：80-54-80 (E)"
+    },
+    {
+        "name":  "河北彩花",
+        "stage_names":  [
+                            "河北彩伽",
+                            "川北彩香",
+                            "Kawakita Saika"
+                        ],
+        "height":  "169cm",
+        "cup_size":  "E",
+        "birthdate":  "1999-04-24",
+        "bio":  "出道：2018-04 S1专属；状态：在役（2026-02 改回本名）；三围：87-57-86 (E)"
+    },
+    {
+        "name":  "凪ひかる",
+        "stage_names":  [
+                            "凪ひかり",
+                            "凪光",
+                            "有栖花あか",
+                            "有栖花绯",
+                            "汐世",
+                            "Nagi Hikaru"
+                        ],
+        "height":  "162cm",
+        "cup_size":  "J",
+        "birthdate":  "1997-04-06",
+        "bio":  "出道：2020-10 S1专属；状态：在役（2026 回归）；三围：105-59-88 (J)"
+    },
+    {
+        "name":  "滨崎真绪",
+        "stage_names":  [
+                            "浜崎真緒",
+                            "Hamasaki Mao",
+                            "DJ MAO"
+                        ],
+        "height":  "165cm",
+        "cup_size":  "E",
+        "birthdate":  "1993-10-20",
+        "bio":  "出道：2012-06 Prestige系；状态：引退（2024-08 转型DJ）；三围：85-59-84 (E)"
+    },
+    {
+        "name":  "本庄铃",
+        "stage_names":  [
+                            "本庄鈴",
+                            "Honjo Suzu"
+                        ],
+        "height":  "163cm",
+        "cup_size":  "C",
+        "birthdate":  "1997-01-12",
+        "bio":  "出道：2018-04-26 SOD star；状态：在役；三围：85-59-88 (C)"
+    },
+    {
+        "name":  "森泽佳奈",
+        "stage_names":  [
+                            "饭冈佳奈子",
+                            "森沢かな",
+                            "飯岡かなこ",
+                            "Moriwaka Kana",
+                            "Ishioka Kanako"
+                        ],
+        "height":  "160cm",
+        "cup_size":  "F",
+        "birthdate":  "1992-05-09",
+        "bio":  "出道：2012-07；状态：在役；三围：86-59-86 (F)"
+    },
+    {
+        "name":  "樱空桃",
+        "stage_names":  [
+                            "桜空もも",
+                            "Sakura Momo"
+                        ],
+        "height":  "160cm",
+        "cup_size":  "G",
+        "birthdate":  "1996-12-03",
+        "bio":  "出道：2017-05 IdeaPocket专属；状态：在役；三围：90-55-86 (G)"
+    },
+    {
+        "name":  "楪可怜",
+        "stage_names":  [
+                            "楪カレン",
+                            "Yuzuriha Karen"
+                        ],
+        "height":  "148cm",
+        "cup_size":  "H",
+        "birthdate":  "2001-03-28",
+        "bio":  "出道：2021-02；状态：在役；三围：96-58-85 (H)"
+    },
+    {
+        "name":  "枫芙爱",
+        "stage_names":  [
+                            "楓ふうあ",
+                            "风华枫",
+                            "楓芙愛",
+                            "Kaede Fua"
+                        ],
+        "height":  "170cm",
+        "cup_size":  "F",
+        "birthdate":  "2001-04-20",
+        "bio":  "出道：2021-08-19 S1专属；状态：在役；三围：93-59-88 (F)"
+    },
+    {
+        "name":  "山岸逢花",
+        "stage_names":  [
+                            "山岸あや花",
+                            "Yamagishi Aika"
+                        ],
+        "height":  "160cm",
+        "cup_size":  "C",
+        "birthdate":  "1992-11-30",
+        "bio":  "出道：2017-07 Premium专属；状态：引退（2025-09 末）；三围：82-59-81 (C)"
+    },
+    {
+        "name":  "向井蓝",
+        "stage_names":  [
+                            "向井藍",
+                            "Mukai Ai"
+                        ],
+        "height":  "157cm",
+        "cup_size":  "C",
+        "birthdate":  "1995-05-30",
+        "bio":  "出道：2015（企画单体）；状态：在役；三围：80-56-82 (C)"
+    },
+    {
+        "name":  "七濑爱丽丝",
+        "stage_names":  [
+                            "七瀬アリス",
+                            "Nanase Alice"
+                        ],
+        "height":  "155cm",
+        "cup_size":  "F",
+        "birthdate":  "1997-02-25",
+        "bio":  "出道：2020 IdeaPocket专属；状态：在役；三围：88-58-86 (F)"
+    },
+    {
+        "name":  "仲村美优",
+        "stage_names":  [
+                            "仲村みう",
+                            "仲村美宇",
+                            "Nakamura Miu"
+                        ],
+        "height":  "157cm",
+        "cup_size":  "C",
+        "birthdate":  "1991-03-14",
+        "bio":  "出道：2017 MUTEKI；状态：在役；三围：83-54-83 (C)"
+    },
+    {
+        "name":  "鹫尾芽衣",
+        "stage_names":  [
+                            "鷲尾めい",
+                            "筧ジュン",
+                            "Washio Mei"
+                        ],
+        "height":  "164cm",
+        "cup_size":  "L",
+        "birthdate":  "1997-10-20",
+        "bio":  "出道：2019-04 S1专属；状态：在役；三围：104-59-89 (L)"
+    },
+    {
+        "name":  "新井优香",
+        "stage_names":  [
+                            "新井優香",
+                            "Arai Yuka"
+                        ],
+        "height":  "167cm",
+        "cup_size":  "F",
+        "birthdate":  "1994-10-15",
+        "bio":  "出道：2018-08 Premium专属；状态：引退（2020-04）；三围：86-58-87 (F)"
+    }
+]

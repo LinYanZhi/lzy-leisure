@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // 休闲时光 - 数据模型（原 api.ts 拆分）
 // 全部为纯类型定义，供 commands/transport/events 与页面组件共用。
 // ============================================================
@@ -154,6 +154,11 @@ export interface Actor {
   sort_order: number;
   created_at: string;
   updated_at: string;
+}
+
+/** 演员 + 名下视频数（演员浏览卡片用） */
+export interface ActorWithCount extends Actor {
+  video_count: number;
 }
 
 export interface TagGroup {

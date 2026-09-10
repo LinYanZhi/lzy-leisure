@@ -1,6 +1,7 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { api, isWeb, videoStreamUrl, type Video } from "../../api";
+import { useIsMobile } from "../../useIsMobile";
 
 interface Props {
   video: Video;
@@ -11,6 +12,12 @@ interface Props {
   index?: number;
   /** 切到另一集（自动连播 / 上/下一集按钮） */
   onSwitch?: (video: Video) => void;
+  /** 播放器形态：full=全屏覆盖层；mini=迷你悬浮窗（视频不中断） */
+  mode?: "full" | "mini";
+  /** mini 窗口点击 → 恢复全屏 */
+  onRestore?: () => void;
+  /** 显式关闭（停止播放并销毁） */
+  onStop?: () => void;
 }
 
 /** 倍速档位（按钮循环 + [ / ] 逐档微调共用） */
@@ -34,13 +41,20 @@ const HELP_ROWS: [string, string][] = [
  * 沉浸式播放器：视频 + 字幕（jassub 覆盖层）+ 续播记忆。
  * 播放控制：倍速 / 快捷键 / 全屏 / 画中画 / 剧集连播（播完自动下一集）。
  */
-export default function PlayerView({ video, onClose, playlist = [], index = 0, onSwitch }: Props) {
+export default function PlayerView({ video, onClose, playlist = [], index = 0, onSwitch, mode = "full", onRestore, onStop }: Props) {
   const [playUrl, setPlayUrl] = useState<string>();
   const [error, setError] = useState("");
   const [subEnabled, setSubEnabled] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  // 移动端：控制栏显隐（3s 自动隐藏）+ 双击 seek 提示
+  const isMobile = useIsMobile();
+  const isMini = mode === "mini";
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [seekHint, setSeekHint] = useState<string>("");
+  const hideTimerRef = useRef<number | null>(null);
+  const lastTapRef = useRef<{ t: number; x: number } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const subCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -49,6 +63,47 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
 
   const hasPrev = index > 0 && playlist.length > 0 && !!onSwitch;
   const hasNext = index < playlist.length - 1 && !!onSwitch;
+
+  // ── 移动端控制栏：播放中 3s 无操作自动隐藏；点击唤出 ──
+  const showControls = useCallback((autoHide = true) => {
+    setControlsVisible(true);
+    if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+    if (autoHide && isMobile) {
+      hideTimerRef.current = window.setTimeout(() => setControlsVisible(false), 3000);
+    }
+  }, [isMobile]);
+  useEffect(() => () => { if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current); }, []);
+
+  // seek 提示（双击快进/快退时显示 1s）
+  const flashSeek = useCallback((hint: string) => {
+    setSeekHint(hint);
+    window.setTimeout(() => setSeekHint(""), 900);
+  }, []);
+
+  // ── 移动端手势（onWrapTap 定义在 seekBy/togglePlay 之后） ──
+
+  // ── 屏幕常亮（播放期间） ──
+  useEffect(() => {
+    let lock: any = null;
+    const acquire = () => {
+      // @ts-ignore wakeLock 为较新 API
+      if (isWeb && navigator.wakeLock?.request) {
+        // @ts-ignore
+        navigator.wakeLock.request("screen").then((l) => { lock = l; }).catch(() => {});
+      }
+    };
+    acquire();
+    return () => { lock?.release?.().catch(() => {}); };
+  }, [isWeb, playUrl]);
+
+  // ── 移动端进入即全屏：作用于视频容器（视频填满屏幕，横屏提示交给浏览器） ──
+  useEffect(() => {
+    if (!isMobile || isMini || !playUrl) return;
+    const el = wrapRef.current;
+    if (el && !document.fullscreenElement) {
+      el.requestFullscreen?.().catch(() => {});
+    }
+  }, [isMobile, isMini, playUrl]);
 
   // 字幕（ass/srt 由 jassub/libass WASM 渲染到覆盖层 canvas）
   useEffect(() => {
@@ -116,6 +171,40 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
     if (!el || !isFinite(el.duration)) return;
     el.currentTime = Math.min(Math.max(0, el.currentTime + delta), el.duration);
   }, []);
+
+  // ── 移动端手势：单击=唤出/隐藏控制栏；双击左/右 1/3 = ±10s；中央双击=播放暂停 ──
+  const onWrapTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!isMobile || isMini) return;
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const now = Date.now();
+    const x = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const last = lastTapRef.current;
+    lastTapRef.current = { t: now, x };
+    // 双击判定：300ms 内第二次点击
+    if (last && now - last.t < 300 && Math.abs(x - last.x) < 60) {
+      const third = rect.width / 3;
+      if (x < rect.left + third) {
+        seekBy(-10);
+        flashSeek("⏪ 10 秒");
+      } else if (x > rect.left + third * 2) {
+        seekBy(10);
+        flashSeek("⏩ 10 秒");
+      } else {
+        togglePlay();
+      }
+      lastTapRef.current = null;
+      return;
+    }
+    // 单击：切换控制栏（等 300ms 看是否双击）
+    window.setTimeout(() => {
+      if (lastTapRef.current && lastTapRef.current.t === now) {
+        lastTapRef.current = null;
+        if (controlsVisible) setControlsVisible(false);
+        else showControls();
+      }
+    }, 300);
+  }, [isMobile, controlsVisible, showControls, seekBy, togglePlay, flashSeek]);
 
   const adjustVolume = useCallback((delta: number) => {
     const el = videoRef.current;
@@ -244,6 +333,7 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
   // [ / ] 倍速、F 全屏、P 画中画、N/Shift+N 切集、? 帮助、Esc 关闭）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (isMini) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
@@ -313,6 +403,7 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
   }, [
     onClose,
     showHelp,
+    isMini,
     togglePlay,
     seekBy,
     adjustVolume,
@@ -336,75 +427,101 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
   const mobileWarn = MOBILE_WARN_FORMATS.has(videoFormat);
 
   return (
-    <div className="pv-overlay">
-      <div className="pv-topbar">
-        <button className="btn btn-sm" onClick={onClose}>← 返回</button>
-        <div className="pv-title" title={video.title}>{video.title}</div>
-        {playlist.length > 0 && (
-          <span className="pv-ep-pos" title="剧集连播位置">{index + 1} / {playlist.length}</span>
-        )}
-        <div className="pv-meta">
-          {[video.duration, res, video.file_size].filter(Boolean).join(" · ")}
-        </div>
-        {hasPrev && (
-          <button className="btn btn-sm" onClick={goPrev} title="上一集（Shift+N）">← 上集</button>
-        )}
-        {hasNext && (
-          <button className="btn btn-sm" onClick={goNext} title="下一集（N；播完自动连播）">下集 →</button>
-        )}
-        {video.subtitle_path && (
+    <div
+      className={isMini ? "pv-mini" : "pv-overlay"}
+      onClick={isMini ? () => onRestore?.() : undefined}
+    >
+      {/* 全屏顶栏（仅 full 模式；mini 模式不渲染，但视频元素跨模式存活） */}
+      {!isMini && (
+        <div key="top" className={`pv-topbar${isMobile && !controlsVisible ? " pv-topbar-hidden" : ""}`}>
+          <button className="btn btn-sm" onClick={onClose}>← 返回</button>
+          <div className="pv-title" title={video.title}>{video.title}</div>
+          {playlist.length > 0 && (
+            <span className="pv-ep-pos" title="剧集连播位置">{index + 1} / {playlist.length}</span>
+          )}
+          <div className="pv-meta">
+            {[video.duration, res, video.file_size].filter(Boolean).join(" · ")}
+          </div>
+          {hasPrev && (
+            <button className="btn btn-sm" onClick={goPrev} title="上一集（Shift+N）">← 上集</button>
+          )}
+          {hasNext && (
+            <button className="btn btn-sm" onClick={goNext} title="下一集（N；播完自动连播）">下集 →</button>
+          )}
+          {video.subtitle_path && (
+            <button
+              className={`btn btn-sm pv-sub-toggle${subEnabled ? " on" : ""}`}
+              onClick={() => setSubEnabled((v) => !v)}
+              title="切换字幕显示"
+            >
+              字幕 {subEnabled ? "开" : "关"}
+            </button>
+          )}
+          <button className="btn btn-sm" onClick={cycleSpeed} title="倍速（[ / ]）">
+            {speedLabel}x
+          </button>
+          {pipSupported && (
+            <button className="btn btn-sm" onClick={() => void togglePip()} title="画中画（P）">
+              画中画
+            </button>
+          )}
           <button
-            className={`btn btn-sm pv-sub-toggle${subEnabled ? " on" : ""}`}
-            onClick={() => setSubEnabled((v) => !v)}
-            title="切换字幕显示"
+            className={`btn btn-sm pv-fs${isFullscreen ? " on" : ""}`}
+            onClick={toggleFullscreen}
+            title="全屏（F）"
           >
-            字幕 {subEnabled ? "开" : "关"}
+            全屏
           </button>
-        )}
-        <button className="btn btn-sm" onClick={cycleSpeed} title="倍速（[ / ]）">
-          {speedLabel}x
-        </button>
-        {pipSupported && (
-          <button className="btn btn-sm" onClick={() => void togglePip()} title="画中画（P）">
-            画中画
+          <button className="btn btn-sm pv-help-btn" onClick={() => setShowHelp(true)} title="快捷键（?）">
+            ?
           </button>
-        )}
-        <button
-          className={`btn btn-sm pv-fs${isFullscreen ? " on" : ""}`}
-          onClick={toggleFullscreen}
-          title="全屏（F）"
-        >
-          全屏
-        </button>
-        <button className="btn btn-sm pv-help-btn" onClick={() => setShowHelp(true)} title="快捷键（?）">
-          ?
-        </button>
-      </div>
+        </div>
+      )}
 
-      <div className="pv-video-wrap">
-        {mobileWarn && (
+      {/* 视频区（full/mini 共用一个元素实例，播放不中断） */}
+      <div key="video" className="pv-video-wrap">
+        {!isMini && mobileWarn && (
           <div className="pv-mobile-warn">
             当前为 {video.file_type || videoFormat} 格式，手机浏览器可能无法播放，建议在电脑上播放
           </div>
         )}
         {playUrl ? (
-          <div className="pv-video-holder" ref={wrapRef}>
-            <video ref={videoRef} className="pv-video" src={playUrl} controls autoPlay />
+          <div
+            className="pv-video-holder"
+            ref={wrapRef}
+            onTouchEnd={isMini ? undefined : onWrapTap}
+            onClick={isMini ? undefined : onWrapTap}
+          >
+            <video
+              ref={videoRef}
+              className="pv-video"
+              src={playUrl}
+              controls={!isMini}
+              autoPlay
+              playsInline
+            />
             {video.subtitle_path && (
               <canvas
                 ref={subCanvasRef}
                 className={`pv-sub-canvas${subEnabled ? "" : " hidden"}`}
               />
             )}
+            {!isMini && isMobile && seekHint && (
+              <div className="pv-seek-hint">{seekHint}</div>
+            )}
           </div>
         ) : (
           <div className="pv-loading">正在加载视频…</div>
         )}
       </div>
-      {error && <div className="pv-error" style={{ padding: "0 16px 12px" }}>{error}</div>}
 
-      {showHelp && (
+      {!isMini && error && (
+        <div key="bottom" className="pv-error" style={{ padding: "0 16px 12px" }}>{error}</div>
+      )}
+
+      {!isMini && showHelp && (
         <div
+          key="help"
           className="pv-help-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowHelp(false);
@@ -424,6 +541,14 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* mini 底部条：标题 + 关闭（停止播放） */}
+      {isMini && (
+        <div key="mini" className="pv-mini-bar" onClick={(e) => e.stopPropagation()}>
+          <span className="pv-mini-title" title={video.title}>{video.title}</span>
+          <button className="pv-mini-close" onClick={onStop} title="停止播放">×</button>
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 //! 演员/标签/剧集（Series）命令。原 commands.rs 拆分，外部路径 `commands::xxx` 不变。
-use super::{data_url, decode_data_url, mime_from_ext};
+use super::{commands_videos, data_url, decode_data_url, mime_from_ext};
 use crate::db::videos as video_db;
 use crate::video_scanner;
 use serde::{Deserialize, Serialize};
@@ -19,9 +19,36 @@ pub struct ActorInput {
     pub sort_order: Option<i64>,
 }
 
+/// 演员 + 作品数（演员浏览卡片展示用）
+#[derive(Serialize)]
+pub struct ActorWithCount {
+    #[serde(flatten)]
+    pub actor: video_db::Actor,
+    pub video_count: i64,
+}
+
 #[tauri::command]
 pub(crate) fn list_actors() -> Result<Vec<video_db::Actor>, String> {
     video_db::list_actors()
+}
+
+#[tauri::command]
+pub(crate) fn list_actors_with_counts() -> Result<Vec<ActorWithCount>, String> {
+    Ok(video_db::list_actors_with_counts()?
+        .into_iter()
+        .map(|(actor, video_count)| ActorWithCount { actor, video_count })
+        .collect())
+}
+
+/// 批量导入演员（从 JSON 清单一次性录入；按 name 稳定 id，重复导入幂等）
+#[tauri::command]
+pub(crate) fn import_actors_batch(actors: Vec<ActorInput>) -> Result<usize, String> {
+    let mut n = 0usize;
+    for input in actors {
+        save_actor(input)?;
+        n += 1;
+    }
+    Ok(n)
 }
 
 #[tauri::command]
@@ -180,8 +207,9 @@ fn register_video_file(path: &str, root_dir: &str) -> Result<video_db::Video, St
         .unwrap_or_else(|| "未命名".to_string());
     // 文件名解析：清洗标题杂质，提取年份/集数（标题为空则回退原始文件名）
     let parsed = video_scanner::parse_video_filename(&title);
+    let raw_title = title.clone();
     let clean_title = if parsed.title.is_empty() {
-        title
+        raw_title
     } else {
         parsed.title.clone()
     };
@@ -221,7 +249,13 @@ fn register_video_file(path: &str, root_dir: &str) -> Result<video_db::Video, St
         video.frame_width,
         video.frame_height,
     );
+    // 自动识别番号 + 演员 + AV 种类（与目录扫描一致）
+    let known_actors = video_db::list_actors().unwrap_or_default();
+    let actor_ids = commands_videos::enrich_from_filename(&mut video, &title, &known_actors);
     video_db::upsert_video(&video)?;
+    if !actor_ids.is_empty() {
+        video_db::link_video_actors(&video.id, &actor_ids)?;
+    }
     Ok(video)
 }
 

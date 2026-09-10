@@ -77,9 +77,10 @@ pub(crate) use commands_videos::{
 };
 pub(crate) use commands_series::{
     actor_image_bytes, create_series, create_series_from_dir, delete_actor, delete_series,
-    delete_tag, delete_tag_group, get_actor_image_data_url, get_series, list_actors, list_series,
-    list_tag_groups, list_tags, save_actor, save_tag, save_tag_group, set_videos_series,
-    update_series, update_video_progress, upload_actor_image, ActorInput, TagInput,
+    delete_tag, delete_tag_group, get_actor_image_data_url, get_series, import_actors_batch,
+    list_actors, list_actors_with_counts, list_series, list_tag_groups, list_tags, save_actor,
+    save_tag, save_tag_group, set_videos_series, update_series, update_video_progress,
+    upload_actor_image, ActorInput, TagInput,
 };
 pub(crate) use commands_novels::{
     add_novel, add_novel_root, delete_novel, get_novel, get_novel_chapter_content,

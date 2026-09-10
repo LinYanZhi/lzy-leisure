@@ -7,6 +7,7 @@ import { pickDirectory, pickFile, pickNovelFile } from "./pickers";
 import type {
   Actor,
   ActorInput,
+  ActorWithCount,
   Comic,
   Novel,
   NovelRootDir,
@@ -183,6 +184,10 @@ export const api = {
 
   // ════════════ 视频：演员 ════════════
   listActors: () => call<Actor[]>("list_actors"),
+  /** 演员 + 名下视频数（演员浏览卡片用） */
+  listActorsWithCounts: () => call<ActorWithCount[]>("list_actors_with_counts"),
+  /** 批量导入演员（JSON 清单；按 name 幂等，重复导入安全） */
+  importActorsBatch: (actors: ActorInput[]) => call<number>("import_actors_batch", { actors }),
   saveActor: (input: ActorInput) => call<Actor>("save_actor", { input }),
   deleteActor: (actorId: string) => call<string>("delete_actor", { actor_id: actorId }),
   uploadActorImage: (actorId: string, dataUrl: string) =>

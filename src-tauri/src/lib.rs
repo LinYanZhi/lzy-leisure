@@ -261,6 +261,8 @@ pub fn run() {
             commands::commands_videos::upload_cover,
             // ── 演员/标签/剧集（commands_series）──
             commands::commands_series::list_actors,
+            commands::commands_series::list_actors_with_counts,
+            commands::commands_series::import_actors_batch,
             commands::commands_series::save_actor,
             commands::commands_series::delete_actor,
             commands::commands_series::upload_actor_image,

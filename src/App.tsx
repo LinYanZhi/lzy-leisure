@@ -11,7 +11,7 @@ import {
 import type { SettingsTab, TabItem } from "@glbt/appkit-ui";
 import { store } from "./data";
 import { isWeb, api } from "./api";
-import type { Comic, Novel, StoryIssue, Video, VideoRootDir, VideoSeries } from "./api";
+import type { Comic, Novel, StoryIssue, Video, VideoRootDir, VideoSeries, Actor } from "./api";
 import { useIsMobile } from "./useIsMobile";
 import ComicShelfView from "./components/comic/ShelfView";
 import ComicChapterView from "./components/comic/ChapterView";
@@ -27,6 +27,7 @@ import VideoDetailView from "./components/video/VideoDetailView";
 import VideoSeriesView from "./components/video/VideoSeriesView";
 import PlayerView from "./components/video/PlayerView";
 import ActorsView from "./components/video/ActorsView";
+import ActorDetailView from "./components/video/ActorDetailView";
 import TagsView from "./components/video/TagsView";
 import "@glbt/appkit-ui/styles";
 import "./App.css";
@@ -150,10 +151,13 @@ function App() {
   const [novelView, setNovelView] = useState<NovelView>({ name: "shelf" });
   // ── 故事会模块视图状态 ──
   const [storyView, setStoryView] = useState<StoryView>({ name: "shelf" });
-  // ── 视频模块：左侧导航页 / 详情页 / 播放器 / 剧集详情 ──
+  // ── 视频模块：左侧导航页 / 详情页 / 播放器 / 剧集详情 / 演员详情 ──
   const [videoPage, setVideoPage] = useState<VideoPage>({ name: "all" });
   const [videoDetail, setVideoDetail] = useState<Video | null>(null);
+  const [actorDetail, setActorDetail] = useState<Actor | null>(null);
   const [playing, setPlaying] = useState<Video | null>(null);
+  // 播放器最小化（返回不杀播放：全屏→迷你悬浮窗→继续浏览）
+  const [playerMinimized, setPlayerMinimized] = useState(false);
   // 剧集连播：当前视频所属剧集的有序列表 + 当前下标
   const [playlist, setPlaylist] = useState<Video[]>([]);
   const [playIndex, setPlayIndex] = useState(0);
@@ -169,6 +173,7 @@ function App() {
   // 播放视频：若属于某剧集，拉取剧集有序列表支持连播
   const playVideo = useCallback(async (video: Video) => {
     setPlaying(video);
+    setPlayerMinimized(false);
     setPlaylist([]);
     setPlayIndex(0);
     if (!video.series_id) return;
@@ -356,32 +361,30 @@ function App() {
   };
 
   const renderVideoModule = () => {
-    // 播放器（沉浸，最顶层）
-    if (playing) {
-      return (
-        <PlayerView
-          video={playing}
-          playlist={playlist}
-          index={playIndex}
-          onSwitch={switchVideo}
-          onClose={() => setPlaying(null)}
-        />
-      );
-    }
-    // 视频详情页
+    // ── 普通内容（书架/详情/演员/剧集）——播放器最小化时保持可见，状态不丢 ──
+    let content: React.ReactNode;
     if (videoDetail) {
-      return (
+      content = (
         <VideoDetailView
           video={videoDetail}
           onBack={() => setVideoDetail(null)}
           onPlay={(v) => void playVideo(v)}
+          onOpenActor={(a) => setActorDetail(a)}
           onChanged={notifyChanged}
         />
       );
-    }
-    // 剧集详情页
-    if (videoSeriesView) {
-      return (
+    } else if (actorDetail) {
+      content = (
+        <ActorDetailView
+          key={actorDetail.id}
+          actor={actorDetail}
+          onBack={() => setActorDetail(null)}
+          onOpenVideo={(v) => setVideoDetail(v)}
+          onPlayVideo={(v) => void playVideo(v)}
+        />
+      );
+    } else if (videoSeriesView) {
+      content = (
         <VideoSeriesView
           seriesId={videoSeriesView.id}
           onBack={() => setVideoSeriesView(null)}
@@ -389,27 +392,26 @@ function App() {
           onChanged={notifyChanged}
         />
       );
-    }
-    // 主区：左侧导航常驻 + 内容（视频墙 / 系列墙 / 资料库页）
-    const main =
-      videoPage.name === "actors" ? (
-        <ActorsView onChanged={notifyChanged} />
-      ) : videoPage.name === "tags" ? (
-        <TagsView onChanged={notifyChanged} />
-      ) : (
-        <VideoShelf
-          key={shelfKey}
-          page={videoPage}
-          action={videoAction}
-          onActionHandled={() => setVideoAction(null)}
-          onOpenVideo={(v) => setVideoDetail(v)}
-          onPlayVideo={(v) => void playVideo(v)}
-          onOpenSeries={(s) => setVideoSeriesView(s)}
-        />
-      );
-    // 手机端：顶栏 + 底部导航 + 抽屉壳；PC 端：左侧导航常驻 + 内容区
-    if (isMobile) {
-      return (
+    } else {
+      // 主区：左侧导航常驻 + 内容（视频墙 / 系列墙 / 资料库页）
+      const main =
+        videoPage.name === "actors" ? (
+          <ActorsView onChanged={notifyChanged} onOpenActor={setActorDetail} />
+        ) : videoPage.name === "tags" ? (
+          <TagsView onChanged={notifyChanged} />
+        ) : (
+          <VideoShelf
+            key={shelfKey}
+            page={videoPage}
+            action={videoAction}
+            onActionHandled={() => setVideoAction(null)}
+            onOpenVideo={(v) => setVideoDetail(v)}
+            onPlayVideo={(v) => void playVideo(v)}
+            onOpenSeries={(s) => setVideoSeriesView(s)}
+          />
+        );
+      // 手机端：顶栏 + 底部导航 + 抽屉壳；PC 端：左侧导航常驻 + 内容区
+      content = isMobile ? (
         <MobileVideoLayout
           page={videoPage}
           roots={videoRoots}
@@ -419,20 +421,43 @@ function App() {
         >
           {main}
         </MobileVideoLayout>
+      ) : (
+        <div className="v-module">
+          <VideoSidebar
+            page={videoPage}
+            roots={videoRoots}
+            onNavigate={setVideoPage}
+            onOpenManager={() => setVideoAction("manager")}
+            onAddVideo={() => setVideoAction("add")}
+          />
+          <div className="v-main">{main}</div>
+        </div>
       );
     }
-    return (
-      <div className="v-module">
-        <VideoSidebar
-          page={videoPage}
-          roots={videoRoots}
-          onNavigate={setVideoPage}
-          onOpenManager={() => setVideoAction("manager")}
-          onAddVideo={() => setVideoAction("add")}
-        />
-        <div className="v-main">{main}</div>
-      </div>
-    );
+
+    // ── 播放器：分层叠加。全屏=覆盖层；最小化=悬浮小窗（视频不中断） ──
+    if (playing) {
+      return (
+        <>
+          {content}
+          <PlayerView
+            video={playing}
+            playlist={playlist}
+            index={playIndex}
+            onSwitch={switchVideo}
+            mode={playerMinimized ? "mini" : "full"}
+            onClose={() => setPlayerMinimized(true)}
+            onRestore={() => setPlayerMinimized(false)}
+            onStop={() => {
+              setPlaying(null);
+              setPlayerMinimized(false);
+              setPlaylist([]);
+            }}
+          />
+        </>
+      );
+    }
+    return content;
   };
 
   const renderNovelModule = () => {
