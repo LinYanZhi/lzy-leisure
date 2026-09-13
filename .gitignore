@@ -20,3 +20,8 @@ Thumbs.db
 # Tauri
 src-tauri/target
 ui/dist
+# 片库数据与个人站点细节（AGENTS.md 红线：不入 git）
+/scripts/local-files.json
+/scripts/site-titles.json
+/scripts/find-avatars-saopinyi.js
+/scripts/build-plate-catalog.ps1
