@@ -8,6 +8,7 @@ import {
   type Video,
 } from "../../api";
 import CoverImage from "./CoverImage";
+import StarRating from "./StarRating";
 import { VIDEO_KINDS } from "./kinds";
 import { ensureVideoCover, probeVideoMeta } from "./videoMedia";
 
@@ -270,6 +271,32 @@ export default function VideoDetailView({ video, onBack, onPlay, onOpenActor, on
                 </button>
                 {cur.progress > 0 && (
                   <button className="btn" onClick={() => onPlay({ ...cur, progress: 0 })}>从头播放</button>
+                )}
+              </div>
+
+              {/* 星级评分（点星打分，点同一星取消） */}
+              <div className="vdt-line">
+                <span className="vdt-line-label">评分</span>
+                <StarRating
+                  rating={cur.rating}
+                  size={20}
+                  showValue
+                  onChange={(r) => {
+                    setCur((prev) => ({ ...prev, rating: r }));
+                    api.updateVideoRating(cur.id, r).catch(() => {});
+                  }}
+                />
+                {cur.rating > 0 && (
+                  <button
+                    className="vdt-unrate"
+                    title="清除评分"
+                    onClick={() => {
+                      setCur((prev) => ({ ...prev, rating: 0 }));
+                      api.updateVideoRating(cur.id, 0).catch(() => {});
+                    }}
+                  >
+                    清除
+                  </button>
                 )}
               </div>
 

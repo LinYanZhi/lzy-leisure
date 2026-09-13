@@ -251,6 +251,11 @@ async fn inner_dispatch(cmd: &str, p: &Value) -> Result<Value, String> {
             let height = p.get("frame_height").and_then(|x| x.as_i64());
             c::update_video_media_meta(id, duration, width, height).map(|_| Value::Null)
         }
+        "update_video_rating" => {
+            let id = req_str(p, "video_id")?;
+            let rating = p.get("rating").and_then(|x| x.as_f64()).ok_or_else(|| "缺少参数: rating".to_string())?;
+            c::update_video_rating(id, rating).map(|_| Value::Null)
+        }
         "delete_video" => req_str(p, "video_id").map(c::delete_video).and_then(flatten),
         "batch_set_video_sort_order" => {
             req_orders(p).map(c::batch_set_video_sort_order).and_then(flatten)

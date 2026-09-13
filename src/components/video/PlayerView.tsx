@@ -46,7 +46,6 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
   const [error, setError] = useState("");
   const [subEnabled, setSubEnabled] = useState(true);
   const [speed, setSpeed] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   // 移动端：控制栏显隐（3s 自动隐藏）+ 双击 seek 提示
   const isMobile = useIsMobile();
@@ -96,19 +95,106 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
     return () => { lock?.release?.().catch(() => {}); };
   }, [isWeb, playUrl]);
 
-  // ── 移动端进入即全屏：作用于视频容器（视频填满屏幕，横屏提示交给浏览器） ──
+  // ── 移动端全屏策略（一次性考虑所有情况）：
+  // 1) 进入播放器时尝试自动全屏（播放点击属于用户手势，effect 内大概率仍有效）→ 视频撑满屏幕
+  // 2) 若自动全屏被浏览器拒绝（手势已失效）→ 视频上显示明显的"⛶ 全屏"按钮兜底，点一下即可
+  // 3) 全屏后横屏视频在竖屏设备上由浏览器提示旋转，转过来即填满
+  // 4) 桌面端不自动全屏，用原生控件/F 键
+  const [fsActive, setFsActive] = useState(false);
+  const [showFsBtn, setShowFsBtn] = useState(false);
+  const [rotateHint, setRotateHint] = useState("");
+
+  // 全屏状态跟踪（自动全屏/原生按钮/手动按钮共用）
+  useEffect(() => {
+    const onChange = () => {
+      const active = !!document.fullscreenElement;
+      setFsActive(active);
+      if (active) setShowFsBtn(false);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  // 自动全屏（移动端、full 模式、视频就绪后尝试一次）
+  useEffect(() => {
+    if (!isMobile || isMini || !playUrl || fsActive) return;
+    const el = wrapRef.current;
+    if (!el) return;
+    let cancelled = false;
+    const tryFs = () => {
+      if (cancelled || document.fullscreenElement) return;
+      // 延迟一拍，等视频元素布局完成后再请求（布局尺寸为 0 时全屏会异常）
+      requestAnimationFrame(() => {
+        if (cancelled || document.fullscreenElement) return;
+        const p = el.requestFullscreen?.().catch(() => {});
+        // 部分浏览器拒绝时 requestFullscreen 返回 rejected promise；再兜一层延时判断
+        if (p) {
+          p.catch(() => {
+            if (!cancelled && !document.fullscreenElement) setShowFsBtn(true);
+          });
+        }
+        // 若 600ms 后仍未进入全屏（老浏览器可能不 reject 也不进入）→ 显示兜底按钮
+        window.setTimeout(() => {
+          if (!cancelled && !document.fullscreenElement) setShowFsBtn(true);
+        }, 600);
+      });
+    };
+    tryFs();
+    return () => {
+      cancelled = true;
+    };
+  }, [isMobile, isMini, playUrl, fsActive]);
+
+  // 旋转提示：视频宽高比与设备方向不匹配时提示旋转（移动端、非全屏时也提示）
   useEffect(() => {
     if (!isMobile || isMini || !playUrl) return;
-    const el = wrapRef.current;
-    if (el && !document.fullscreenElement) {
-      el.requestFullscreen?.().catch(() => {});
+    const vw = video.frame_width || videoRef.current?.videoWidth || 0;
+    const vh = video.frame_height || videoRef.current?.videoHeight || 0;
+    if (!vw || !vh) return;
+    const videoLandscape = vw > vh;
+    const portrait = window.innerHeight > window.innerWidth;
+    if (videoLandscape && portrait) {
+      setRotateHint("↻ 旋转手机横屏观看，效果更佳");
+    } else if (!videoLandscape && !portrait) {
+      setRotateHint("↻ 旋转手机竖屏观看，效果更佳");
+    } else {
+      setRotateHint("");
     }
-  }, [isMobile, isMini, playUrl]);
+    const t = window.setTimeout(() => setRotateHint(""), 4000);
+    return () => window.clearTimeout(t);
+  }, [isMobile, isMini, playUrl, video.frame_width, video.frame_height]);
 
   // 字幕（ass/srt 由 jassub/libass WASM 渲染到覆盖层 canvas）
+  const subResizeRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     if (!video.subtitle_path || !playUrl) return;
     let cancelled = false;
+
+    // 计算视频实际显示区域（object-fit:contain 后的内容框，排除黑边），
+    // 让字幕 canvas 与视频内容严格对齐
+    const layoutCanvas = (canvas: HTMLCanvasElement, videoEl: HTMLVideoElement) => {
+      const container = wrapRef.current?.parentElement ?? videoEl.parentElement;
+      const cw = container?.clientWidth ?? videoEl.clientWidth;
+      const ch = container?.clientHeight ?? videoEl.clientHeight;
+      const vw = videoEl.videoWidth;
+      const vh = videoEl.videoHeight;
+      let w = cw;
+      let h = ch;
+      if (vw && vh && cw && ch) {
+        const scale = Math.min(cw / vw, ch / vh);
+        w = Math.max(1, Math.round(vw * scale));
+        h = Math.max(1, Math.round(vh * scale));
+      }
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      canvas.style.left = "50%";
+      canvas.style.top = "50%";
+      canvas.style.transform = "translate(-50%, -50%)";
+      canvas.width = w;
+      canvas.height = h;
+    };
+
     (async () => {
       try {
         const content = await api.getVideoSubtitle(video.id);
@@ -116,6 +202,7 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
         const videoEl = videoRef.current;
         const canvas = subCanvasRef.current;
         if (!videoEl || !canvas) return;
+        layoutCanvas(canvas, videoEl);
         const { default: JASSUB } = await import("jassub");
         const inst = new JASSUB({
           video: videoEl,
@@ -129,12 +216,27 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
           return;
         }
         subInstRef.current = inst;
+        // 窗口/全屏尺寸变化时重排字幕层
+        const onResize = () => {
+          if (!cancelled && videoRef.current && subCanvasRef.current) {
+            layoutCanvas(subCanvasRef.current, videoRef.current);
+            inst.resize?.();
+          }
+        };
+        subResizeRef.current = onResize;
+        window.addEventListener("resize", onResize);
+        document.addEventListener("fullscreenchange", onResize);
       } catch (e) {
         console.error("字幕加载失败:", e);
       }
     })();
     return () => {
       cancelled = true;
+      if (subResizeRef.current) {
+        window.removeEventListener("resize", subResizeRef.current);
+        document.removeEventListener("fullscreenchange", subResizeRef.current);
+        subResizeRef.current = null;
+      }
       subInstRef.current?.destroy?.().catch(() => {});
       subInstRef.current = null;
     };
@@ -256,14 +358,78 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
     if (hasNext && onSwitch) onSwitch(playlist[index + 1]);
   }, [hasNext, index, onSwitch, playlist]);
 
-  // 播完自动下一集
+  // ── 播完提示：有下一集 → 5s 倒计时自动连播（可取消）；单集 → 重播/关闭 ──
+  const [endState, setEndState] = useState<"next" | "replay" | null>(null);
+  const [countdown, setCountdown] = useState(0);
+  const countdownRef = useRef<number | null>(null);
+
+  const clearCountdown = useCallback(() => {
+    if (countdownRef.current) {
+      window.clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setEndState(null);
+  }, []);
+
+  const replay = useCallback(() => {
+    clearCountdown();
+    const el = videoRef.current;
+    if (el) {
+      el.currentTime = 0;
+      el.play().catch(() => {});
+    }
+  }, [clearCountdown]);
+
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-    const onEnded = () => goNext();
+    const onEnded = () => {
+      if (isMini) {
+        // 迷你窗不做倒计时，直接连播
+        goNext();
+        return;
+      }
+      if (hasNext) {
+        setEndState("next");
+        setCountdown(5);
+        if (countdownRef.current) window.clearInterval(countdownRef.current);
+        countdownRef.current = window.setInterval(() => {
+          setCountdown((c) => {
+            if (c <= 1) {
+              if (countdownRef.current) {
+                window.clearInterval(countdownRef.current);
+                countdownRef.current = null;
+              }
+              setEndState(null);
+              goNext();
+              return 0;
+            }
+            return c - 1;
+          });
+        }, 1000);
+      } else {
+        setEndState("replay");
+      }
+    };
     el.addEventListener("ended", onEnded);
-    return () => el.removeEventListener("ended", onEnded);
-  }, [goNext]);
+    return () => {
+      el.removeEventListener("ended", onEnded);
+      if (countdownRef.current) {
+        window.clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    };
+  }, [goNext, hasNext, isMini]);
+
+  // 切换视频/关闭时清除提示与倒计时
+  useEffect(() => {
+    setEndState(null);
+    setCountdown(0);
+    if (countdownRef.current) {
+      window.clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+  }, [playUrl, video.id]);
 
   // 续播：元数据加载后跳转到上次进度（跳过开头/结尾的边界值）
   useEffect(() => {
@@ -322,13 +488,6 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
     };
   }, [video.id]);
 
-  // 全屏状态跟踪（按钮高亮）
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
-
   // 快捷键（空格/K 播放、方向键/JL 快进快退、上下音量、M 静音、
   // [ / ] 倍速、F 全屏、P 画中画、N/Shift+N 切集、? 帮助、Esc 关闭）
   useEffect(() => {
@@ -341,6 +500,7 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
       switch (k) {
         case "escape":
           if (showHelp) setShowHelp(false);
+          else if (endState) clearCountdown();
           else onClose();
           break;
         case " ":
@@ -404,6 +564,8 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
     onClose,
     showHelp,
     isMini,
+    endState,
+    clearCountdown,
     togglePlay,
     seekBy,
     adjustVolume,
@@ -465,13 +627,6 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
               画中画
             </button>
           )}
-          <button
-            className={`btn btn-sm pv-fs${isFullscreen ? " on" : ""}`}
-            onClick={toggleFullscreen}
-            title="全屏（F）"
-          >
-            全屏
-          </button>
           <button className="btn btn-sm pv-help-btn" onClick={() => setShowHelp(true)} title="快捷键（?）">
             ?
           </button>
@@ -508,6 +663,27 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
             )}
             {!isMini && isMobile && seekHint && (
               <div className="pv-seek-hint">{seekHint}</div>
+            )}
+            {/* 移动端兜底：自动全屏失败时显示明显"全屏"按钮 */}
+            {!isMini && isMobile && !fsActive && showFsBtn && (
+              <button
+                className="pv-fs-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const el = wrapRef.current;
+                  if (el) {
+                    const p = el.requestFullscreen?.();
+                    p?.catch?.(() => {});
+                  }
+                  setShowFsBtn(false);
+                }}
+              >
+                ⛶ 全屏观看
+              </button>
+            )}
+            {/* 旋转提示（视频方向与设备方向不匹配时短暂提示） */}
+            {!isMini && isMobile && rotateHint && (
+              <div className="pv-rotate-hint">{rotateHint}</div>
             )}
           </div>
         ) : (
@@ -549,6 +725,35 @@ export default function PlayerView({ video, onClose, playlist = [], index = 0, o
         <div key="mini" className="pv-mini-bar" onClick={(e) => e.stopPropagation()}>
           <span className="pv-mini-title" title={video.title}>{video.title}</span>
           <button className="pv-mini-close" onClick={onStop} title="停止播放">×</button>
+        </div>
+      )}
+
+      {/* 播完提示：连播倒计时 / 重播 */}
+      {!isMini && endState === "next" && hasNext && (
+        <div key="end-next" className="pv-end-overlay">
+          <div className="pv-end-box">
+            <div className="pv-end-title">即将播放下一集</div>
+            <div className="pv-end-sub">
+              <span className="pv-end-count">{countdown}</span> 秒后自动连播 · {playlist[index + 1].title}
+            </div>
+            <div className="pv-end-actions">
+              <button className="btn btn-sm btn-primary" onClick={() => { clearCountdown(); goNext(); }}>
+                立即播放
+              </button>
+              <button className="btn btn-sm" onClick={clearCountdown}>取消</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {!isMini && endState === "replay" && (
+        <div key="end-replay" className="pv-end-overlay">
+          <div className="pv-end-box">
+            <div className="pv-end-title">播放结束</div>
+            <div className="pv-end-actions">
+              <button className="btn btn-sm btn-primary" onClick={replay}>重播</button>
+              <button className="btn btn-sm" onClick={onClose}>关闭</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

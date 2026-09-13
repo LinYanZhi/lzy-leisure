@@ -136,6 +136,9 @@ export const api = {
   /** 读取视频同名字幕内容（UTF-8；ass/srt 常见 GBK 自动转码） */
   getVideoSubtitle: (videoId: string) => call<string>("get_video_subtitle", { video_id: videoId }),
   updateVideo: (edit: VideoEdit) => call<string>("update_video", { edit }),
+  /** 打分：轻量更新评分（0-10；0 表示取消评分） */
+  updateVideoRating: (videoId: string, rating: number) =>
+    call<null>("update_video_rating", { video_id: videoId, rating }),
   /** 前端按需补全媒体元数据（时长/分辨率；大小与格式由后端读取） */
   updateVideoMediaMeta: (
     videoId: string,

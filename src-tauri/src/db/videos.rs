@@ -142,6 +142,8 @@ pub struct VideoFilter {
     pub root_dir: Option<String>,
     /// 按剧集过滤；None 表示全部（"unassigned" 表示未归入任何剧集）
     pub series_id: Option<String>,
+    /// 最低评分过滤（0-10；None 表示不过滤）。如 8.0 = 只看 4 星及以上
+    pub rating_min: Option<f64>,
 }
 
 /// 批量加载视频的演员/标签关联（list_videos 用）。
@@ -218,6 +220,7 @@ pub fn list_videos(filter: &VideoFilter) -> Result<Vec<Video>, String> {
         || !filter.kinds.is_empty()
         || filter.root_dir.is_some()
         || filter.series_id.is_some()
+        || filter.rating_min.is_some()
     {
         videos.retain(|v| {
             let mut ok = true;
@@ -244,6 +247,9 @@ pub fn list_videos(filter: &VideoFilter) -> Result<Vec<Video>, String> {
                 } else {
                     v.series_id == *sid
                 };
+            }
+            if let Some(min) = filter.rating_min {
+                ok &= v.rating >= min;
             }
             ok
         });
@@ -496,6 +502,18 @@ pub fn update_video_license_plate(video_id: &str, plate: &str) -> Result<(), Str
         params![plate, ts, video_id],
     )
     .map_err(|e| format!("更新番号失败: {e}"))?;
+    Ok(())
+}
+
+/// 更新评分（0-10；0 表示未评分）。打分系统专用轻量命令，避免整条编辑。
+pub fn update_video_rating(video_id: &str, rating: f64) -> Result<(), String> {
+    let ts = crate::db::now();
+    let conn = lock()?;
+    conn.execute(
+        "UPDATE videos SET rating = ?1, updated_at = ?2 WHERE id = ?3",
+        params![rating, ts, video_id],
+    )
+    .map_err(|e| format!("更新评分失败: {e}"))?;
     Ok(())
 }
 

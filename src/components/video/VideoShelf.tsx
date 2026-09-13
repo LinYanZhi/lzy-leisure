@@ -11,7 +11,9 @@ import {
   type VideoSeries,
 } from "../../api";
 import CoverImage from "./CoverImage";
+import StarRating from "./StarRating";
 import { KIND_LABEL } from "./kinds";
+import { useIsMobile } from "../../useIsMobile";
 import { ensureVideoCover, probeVideoMeta } from "./videoMedia";
 import type { VideoPage } from "./VideoSidebar";
 
@@ -52,24 +54,6 @@ function resLabel(w?: number | null, h?: number | null): string {
   if (w >= 1920) return "1080P";
   if (w >= 1280) return "720P";
   return `${w}×${h}`;
-}
-
-/** 视频卡片悬停操作 */
-function iconBtn(title: string, onClick: (e: React.MouseEvent) => void, icon: React.ReactNode) {
-  return (
-    <button
-      className="vs-card-btn"
-      title={title}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick(e);
-      }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        {icon}
-      </svg>
-    </button>
-  );
 }
 
 const ICONS = {
@@ -138,6 +122,8 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedActors, setSelectedActors] = useState<string[]>([]);
   const [matchAll, setMatchAll] = useState(false);
+  // 只看高评分（≥4 星 = rating ≥ 8）
+  const [highRated, setHighRated] = useState(false);
   // 筛选面板展开状态（演员/标签 chips，默认收起保持页面干净）
   const [showFilters, setShowFilters] = useState(false);
 
@@ -147,6 +133,12 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
   const [coverRev, setCoverRev] = useState(0);
   // 卡片"⋯"操作菜单（详情/播放/删除/打开目录）
   const [menuVideo, setMenuVideo] = useState<Video | null>(null);
+  // 系列卡片"⋯"操作菜单
+  const [menuSeries, setMenuSeries] = useState<VideoSeries | null>(null);
+  // 继续观看折叠状态：null=跟随设备（桌面展开、手机收起）
+  const isMobile = useIsMobile();
+  const [continueOpen, setContinueOpen] = useState<boolean | null>(null);
+  const continueVisible = continueOpen ?? !isMobile;
 
   // 视频源管理弹窗
   const [showManager, setShowManager] = useState(false);
@@ -161,8 +153,19 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
     setSelectedTags([]);
     setSelectedActors([]);
     setMatchAll(false);
+    setHighRated(false);
     setShowFilters(false);
   }, [page]);
+
+  // 卡片快捷评分（乐观更新 + 后端保存）
+  const rateVideo = useCallback(async (v: Video, rating: number) => {
+    setVideos((prev) => prev.map((x) => (x.id === v.id ? { ...x, rating } : x)));
+    try {
+      await api.updateVideoRating(v.id, rating);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
 
   const loadVideos = useCallback(async () => {
     setVideoLoading(true);
@@ -174,6 +177,7 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
         actor_ids: selectedActors,
         kinds: page.name === "kind" ? [page.kind] : undefined,
         root_dir: page.name === "root" ? page.path : undefined,
+        rating_min: highRated ? 8 : undefined,
       };
       setVideos(await api.listVideos(q));
       setError("");
@@ -182,7 +186,7 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
     } finally {
       setVideoLoading(false);
     }
-  }, [search, selectedTags, matchAll, selectedActors, page]);
+  }, [search, selectedTags, matchAll, selectedActors, page, highRated]);
 
   const loadAll = useCallback(async () => {
     try {
@@ -447,6 +451,15 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
               筛选
             </button>
           )}
+          {!showSeries && (
+            <button
+              className={`btn-ghost v-filter-btn${highRated ? " active" : ""}`}
+              onClick={() => setHighRated((h) => !h)}
+              title="只看 4 星及以上评分"
+            >
+              ★ 高分
+            </button>
+          )}
           <button className="btn-ghost vs-manager-btn" onClick={() => setShowManager(true)} title="管理导入的视频目录">
             视频源管理
           </button>
@@ -526,9 +539,27 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
                   )}
                   <span className="vs-series-count">{s.video_count} 集</span>
                   <div className="vs-card-hover">
-                    {iconBtn("打开剧集", () => onOpenSeries(s), ICONS.play)}
-                    {iconBtn("删除剧集", () => void removeSeries(s), ICONS.trash)}
+                    <button
+                      className="vs-card-play"
+                      title="打开剧集"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenSeries(s);
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24">{ICONS.play}</svg>
+                    </button>
                   </div>
+                  <button
+                    className="vs-card-more"
+                    title="更多操作"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuSeries(s);
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24">{ICONS.more}</svg>
+                  </button>
                 </div>
                 <div className="vs-title" title={s.title}>{s.title}</div>
               </div>
@@ -546,42 +577,54 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
         </div>
       ) : (
         <>
-          {/* ── 继续观看（有进度的视频横排） ── */}
+          {/* ── 继续观看（可折叠：桌面展开、手机默认收起，避免占屏） ── */}
           {!hasFilters && videos.some((v) => v.progress > 0 && v.duration) && (
             <div className="vs-continue">
-              <div className="vs-continue-title">继续观看</div>
-              <div className="vs-continue-row">
-                {videos
-                  .filter((v) => v.progress > 0 && v.duration)
-                  .slice(0, 12)
-                  .map((v) => {
-                    const pct = Math.min(100, (v.progress / durToSec(v.duration)) * 100);
-                    return (
-                      <div
-                        key={v.id}
-                        className="vs-continue-card"
-                        onClick={() => onPlayVideo(v)}
-                        title={`续播 ${fmtSec(v.progress)} / ${v.duration}`}
-                      >
-                        <div className="vs-cover-wrap vs-continue-cover">
-                          <CoverImage videoId={v.id} version={coverRev} className="vs-cover" />
-                          <div className="vs-progress-bar">
-                            <div className="vs-progress-fill" style={{ width: `${pct}%` }} />
+              <button
+                className="vs-continue-head"
+                onClick={() => setContinueOpen((o) => !(o ?? !isMobile))}
+                title={continueVisible ? "收起继续观看" : "展开继续观看"}
+              >
+                <span className="vs-continue-title">继续观看</span>
+                <span className="vs-continue-count">
+                  {videos.filter((v) => v.progress > 0 && v.duration).length} 个
+                </span>
+                <span className="vs-continue-toggle">{continueVisible ? "▾" : "▸"}</span>
+              </button>
+              {continueVisible && (
+                <div className="vs-continue-row">
+                  {videos
+                    .filter((v) => v.progress > 0 && v.duration)
+                    .slice(0, 12)
+                    .map((v) => {
+                      const pct = Math.min(100, (v.progress / durToSec(v.duration)) * 100);
+                      return (
+                        <div
+                          key={v.id}
+                          className="vs-continue-card"
+                          onClick={() => onPlayVideo(v)}
+                          title={`续播 ${fmtSec(v.progress)} / ${v.duration}`}
+                        >
+                          <div className="vs-cover-wrap vs-continue-cover">
+                            <CoverImage videoId={v.id} version={coverRev} className="vs-cover" />
+                            <div className="vs-progress-bar">
+                              <div className="vs-progress-fill" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="vs-continue-time">{fmtSec(v.progress)}</span>
                           </div>
-                          <span className="vs-continue-time">{fmtSec(v.progress)}</span>
+                          <div className="vs-title vs-continue-name" title={v.title}>{v.title}</div>
                         </div>
-                        <div className="vs-title vs-continue-name" title={v.title}>{v.title}</div>
-                      </div>
-                    );
-                  })}
-              </div>
+                      );
+                    })}
+                </div>
+              )}
             </div>
           )}
 
           <div className="vs-grid">
             {videos.map((v) => {
-              // 时长放在标题下方小字（meta）里，封面不再叠加角标
-              const meta = [v.duration, resLabel(v.frame_width, v.frame_height), v.year]
+              // 时长已作为封面角标展示，meta 只留分辨率/年份
+              const meta = [resLabel(v.frame_width, v.frame_height), v.year]
                 .filter(Boolean)
                 .join(" · ") || v.file_type;
               return (
@@ -602,7 +645,22 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
                         />
                       </div>
                     )}
-                    {/* 卡片"⋯"菜单（手机常显，桌面悬停显示） */}
+                    {/* 时长角标（B站风格，封面右下角） */}
+                    {v.duration && <span className="vs-duration">{v.duration}</span>}
+                    {/* 悬停播放（桌面）；卡片点击本身即播放/进详情 */}
+                    <div className="vs-card-hover">
+                      <button
+                        className="vs-card-play"
+                        title="播放"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPlayVideo(v);
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24">{ICONS.play}</svg>
+                      </button>
+                    </div>
+                    {/* 卡片"⋯"菜单（管理操作统一收这里：手机常显，桌面悬停显示） */}
                     <button
                       className="vs-card-more"
                       title="更多操作"
@@ -611,19 +669,15 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
                         setMenuVideo(v);
                       }}
                     >
-                      {ICONS.more}
+                      <svg viewBox="0 0 24 24">{ICONS.more}</svg>
                     </button>
-                    <div className="vs-card-hover">
-                      {iconBtn("播放", () => onPlayVideo(v), ICONS.play)}
-                      {iconBtn("详情", () => onOpenVideo(v), ICONS.info)}
-                      {iconBtn("打开所在目录", () => void openFolder(v), ICONS.folder)}
-                      {iconBtn("重新生成封面", () => void regenerate(v), ICONS.refresh)}
-                      {iconBtn("删除记录", () => void removeVideo(v), ICONS.trash)}
-                    </div>
                   </div>
                   <div className="vs-title" title={v.title}>{v.title}</div>
                   {v.episode && <div className="vs-episode" title="集数">{v.episode}</div>}
                   <div className="vs-meta">{meta}</div>
+                  <div className="vs-rating">
+                    <StarRating rating={v.rating} onChange={(r) => void rateVideo(v, r)} size={13} showValue />
+                  </div>
                 </div>
               );
             })}
@@ -692,6 +746,41 @@ export default function VideoShelf({ page, action, onActionHandled, onOpenVideo,
               🗑 删除记录
             </button>
             <button className="vs-menu-cancel" onClick={() => setMenuVideo(null)}>取消</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 系列卡片操作菜单 ── */}
+      {menuSeries && (
+        <div
+          className="vs-menu-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setMenuSeries(null);
+          }}
+        >
+          <div className="vs-menu-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="vs-menu-title" title={menuSeries.title}>{menuSeries.title}</div>
+            <button
+              className="vs-menu-item"
+              onClick={() => {
+                const s = menuSeries;
+                setMenuSeries(null);
+                onOpenSeries(s);
+              }}
+            >
+              📂 打开剧集
+            </button>
+            <button
+              className="vs-menu-item vs-menu-danger"
+              onClick={() => {
+                const s = menuSeries;
+                setMenuSeries(null);
+                void removeSeries(s);
+              }}
+            >
+              🗑 删除剧集
+            </button>
+            <button className="vs-menu-cancel" onClick={() => setMenuSeries(null)}>取消</button>
           </div>
         </div>
       )}

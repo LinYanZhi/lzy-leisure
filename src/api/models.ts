@@ -196,6 +196,8 @@ export interface VideoQuery {
   root_dir?: string;
   /** 按剧集过滤；缺省表示全部，"unassigned" 表示未归入任何剧集 */
   series_id?: string;
+  /** 最低评分过滤（0-10；如 8 表示只看 4 星及以上） */
+  rating_min?: number;
 }
 
 export interface VideoEdit {

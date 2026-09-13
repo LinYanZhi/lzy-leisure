@@ -247,6 +247,7 @@ pub fn run() {
             commands::commands_videos::get_video_subtitle,
             commands::commands_videos::update_video,
             commands::commands_videos::update_video_media_meta,
+            commands::commands_videos::update_video_rating,
             commands::commands_videos::get_video_roots,
             commands::commands_videos::add_video_root,
             commands::commands_videos::remove_video_root,

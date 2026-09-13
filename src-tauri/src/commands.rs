@@ -72,8 +72,8 @@ pub(crate) use commands_videos::{
     add_video, add_video_root, batch_set_video_sort_order, delete_video, get_video,
     get_video_cover_data_url, get_video_play_path, get_video_roots, get_video_subtitle,
     has_video_cover, list_videos, open_video_folder, remove_video_root, rescan_all_video_roots,
-    rescan_video_root, scan_directory, update_video, update_video_media_meta, upload_cover,
-    video_cover_bytes, VideoEdit, VideoQuery,
+    rescan_video_root, scan_directory, update_video, update_video_media_meta, update_video_rating,
+    upload_cover, video_cover_bytes, VideoEdit, VideoQuery,
 };
 pub(crate) use commands_series::{
     actor_image_bytes, create_series, create_series_from_dir, delete_actor, delete_series,

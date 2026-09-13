@@ -409,6 +409,8 @@ pub struct VideoQuery {
     /// 按剧集过滤；空/缺省表示全部，"unassigned" 表示未归入任何剧集
     #[serde(default)]
     pub series_id: Option<String>,
+    /// 最低评分过滤（0-10；缺省不过滤）
+    pub rating_min: Option<f64>,
 }
 
 #[tauri::command]
@@ -423,8 +425,16 @@ pub(crate) fn list_videos(query: Option<VideoQuery>) -> Result<Vec<video_db::Vid
         kinds: q.kinds,
         root_dir: q.root_dir.filter(|p| !p.is_empty()),
         series_id: q.series_id.filter(|s| !s.is_empty()),
+        rating_min: q.rating_min,
     };
     video_db::list_videos(&filter)
+}
+
+/// 打分：轻量更新评分（0-10；0 表示取消评分）
+#[tauri::command]
+pub(crate) fn update_video_rating(video_id: String, rating: f64) -> Result<(), String> {
+    let r = rating.clamp(0.0, 10.0);
+    video_db::update_video_rating(&video_id, r)
 }
 
 #[tauri::command]
